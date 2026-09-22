@@ -670,12 +670,14 @@ impl JavaClient {
     }
 
     pub async fn send_packet_now(&self, packet: Bytes) {
-        if let Some(packet) = self.apply_packet_sent_event(packet).await {
-            self.send_packet_now_data(packet).await;
-        }
+        self.send_packet_now_data(packet).await;
     }
 
     pub async fn send_packet_now_data(&self, packet: Bytes) {
+        let Some(packet) = self.apply_packet_sent_event(packet).await else {
+            return;
+        };
+
         if self.close_token.is_cancelled() {
             return;
         }
