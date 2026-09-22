@@ -1,0 +1,34 @@
+name: PlayAsia lobby build
+
+on:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-Dwarnings"
+
+jobs:
+  build-linux-x64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build Pumpkin
+        run: cargo build --release --locked
+
+      - name: Package binary and hash
+        run: |
+          mkdir -p dist
+          cp target/release/pumpkin dist/pumpkin
+          sha256sum dist/pumpkin > dist/pumpkin.sha256
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pumpkin-playasia-lobby-linux-x64
+          path: dist/
+          compression-level: 9

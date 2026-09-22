@@ -36,7 +36,7 @@ use pumpkin_protocol::{
         packet_decoder::TCPNetworkDecoder,
         packet_encoder::TCPNetworkEncoder,
     },
-    ser::{NetworkWriteExt, WritingError},
+    ser::{NetworkReadExt, NetworkWriteExt, WritingError},
 };
 use pumpkin_util::text::TextComponent;
 use pumpkin_util::version::JavaMinecraftVersion;
@@ -633,8 +633,46 @@ impl JavaClient {
         self.close();
     }
 
+    /// Apply the server packet event before putting an already-serialized packet
+    /// on the wire. WASM packet translators receive the packet id and body as
+    /// raw bytes, so this is the common choke point for packets that were
+    /// serialized by a caller before enqueueing.
+    async fn apply_packet_sent_event(&self, packet: Bytes) -> Option<Bytes> {
+        let mut encoded = packet.as_ref();
+        let packet_id = encoded.get_var_int().ok()?.0;
+        let payload = Bytes::copy_from_slice(encoded);
+
+        let player = self.player.load_full();
+        let Some(player) = player.as_ref() else {
+            return Some(packet);
+        };
+
+        let event = player
+            .fire_packet_sent_event_no_obj(packet_id, payload)
+            .await;
+        if event.cancelled {
+            return None;
+        }
+
+        if event.packet_id == packet_id && event.payload.as_ref() == encoded {
+            return Some(packet);
+        }
+
+        let mut rewritten = Vec::with_capacity(event.payload.len() + 5);
+        if rewritten
+            .write_var_int(&VarInt(event.packet_id))
+            .is_err()
+        {
+            return None;
+        }
+        rewritten.extend_from_slice(&event.payload);
+        Some(Bytes::from(rewritten))
+    }
+
     pub async fn send_packet_now(&self, packet: Bytes) {
-        self.send_packet_now_data(packet).await;
+        if let Some(packet) = self.apply_packet_sent_event(packet).await {
+            self.send_packet_now_data(packet).await;
+        }
     }
 
     pub async fn send_packet_now_data(&self, packet: Bytes) {
