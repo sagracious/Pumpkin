@@ -92,7 +92,7 @@ pub struct JavaClient {
     /// The client's brand or modpack information. Lock-free `ArcSwap`.
     pub brand: ArcSwap<Option<String>>,
     /// Associated player reference. Lock-free `ArcSwap`.
-    pub player: ArcSwap<Option<Arc<Player>>>,
+    pub player: Arc<ArcSwap<Option<Arc<Player>>>>,
     /// A collection of tasks associated with this client. The tasks await completion when removing the client.
     tasks: TaskTracker,
     rt_handle: tokio::runtime::Handle,
@@ -211,6 +211,52 @@ async fn frame_batch_maybe_offload(
     }
 }
 
+async fn apply_packet_sent_events(
+    packets: Vec<OutgoingPacket>,
+    player_store: &Arc<ArcSwap<Option<Arc<Player>>>>,
+    pending_bytes: &Arc<AtomicUsize>,
+) -> Vec<OutgoingPacket> {
+    let player = player_store.load_full();
+    let Some(player) = player.as_ref() else {
+        return packets;
+    };
+
+    let mut translated = Vec::with_capacity(packets.len());
+    for mut packet in packets {
+        let mut encoded = packet.data.as_ref();
+        let Ok(packet_id) = encoded.get_var_int().map(|id| id.0) else {
+            translated.push(packet);
+            continue;
+        };
+        let payload = Bytes::copy_from_slice(encoded);
+        let event = player
+            .fire_packet_sent_event_no_obj(packet_id, payload)
+            .await;
+        if event.cancelled {
+            decrement_pending_bytes(pending_bytes, packet.data.len());
+            continue;
+        }
+        if event.packet_id != packet_id || event.payload.as_ref() != encoded {
+            let mut rewritten = Vec::with_capacity(event.payload.len() + 5);
+            if rewritten
+                .write_var_int(&VarInt(event.packet_id))
+                .is_ok()
+            {
+                rewritten.extend_from_slice(&event.payload);
+                let old_len = packet.data.len();
+                packet.data = Bytes::from(rewritten);
+                if packet.data.len() > old_len {
+                    pending_bytes.fetch_add(packet.data.len() - old_len, Ordering::AcqRel);
+                } else {
+                    decrement_pending_bytes(pending_bytes, old_len - packet.data.len());
+                }
+            }
+        }
+        translated.push(packet);
+    }
+    translated
+}
+
 impl OutgoingPacket {
     const fn normal(data: Bytes) -> Self {
         Self {
@@ -256,7 +302,7 @@ impl JavaClient {
             network_writer: std::sync::Mutex::new(Some(pending.network_writer)),
             network_reader: std::sync::Mutex::new(Some(pending.network_reader)),
             brand: ArcSwap::from_pointee(pending.brand),
-            player: ArcSwap::from_pointee(None),
+            player: Arc::new(ArcSwap::from_pointee(None)),
             wait_for_keep_alive: AtomicBool::new(false),
             received_movement_this_tick: AtomicBool::new(false),
             keep_alive_id: AtomicCell::new(0),
@@ -633,51 +679,11 @@ impl JavaClient {
         self.close();
     }
 
-    /// Apply the server packet event before putting an already-serialized packet
-    /// on the wire. WASM packet translators receive the packet id and body as
-    /// raw bytes, so this is the common choke point for packets that were
-    /// serialized by a caller before enqueueing.
-    async fn apply_packet_sent_event(&self, packet: Bytes) -> Option<Bytes> {
-        let mut encoded = packet.as_ref();
-        let packet_id = encoded.get_var_int().ok()?.0;
-        let payload = Bytes::copy_from_slice(encoded);
-
-        let player = self.player.load_full();
-        let Some(player) = player.as_ref() else {
-            return Some(packet);
-        };
-
-        let event = player
-            .fire_packet_sent_event_no_obj(packet_id, payload)
-            .await;
-        if event.cancelled {
-            return None;
-        }
-
-        if event.packet_id == packet_id && event.payload.as_ref() == encoded {
-            return Some(packet);
-        }
-
-        let mut rewritten = Vec::with_capacity(event.payload.len() + 5);
-        if rewritten
-            .write_var_int(&VarInt(event.packet_id))
-            .is_err()
-        {
-            return None;
-        }
-        rewritten.extend_from_slice(&event.payload);
-        Some(Bytes::from(rewritten))
-    }
-
     pub async fn send_packet_now(&self, packet: Bytes) {
         self.send_packet_now_data(packet).await;
     }
 
     pub async fn send_packet_now_data(&self, packet: Bytes) {
-        let Some(packet) = self.apply_packet_sent_event(packet).await else {
-            return;
-        };
-
         if self.close_token.is_cancelled() {
             return;
         }
@@ -790,6 +796,7 @@ impl JavaClient {
         };
         let close_token = self.close_token.clone();
         let pending_bytes = self.pending_bytes.clone();
+        let player = self.player.clone();
         let Some(mut writer) = self
             .network_writer
             .lock()
@@ -834,6 +841,8 @@ impl JavaClient {
                         Err(TryRecvError::Disconnected | TryRecvError::Empty) => break,
                     }
                 }
+
+                let packet_batch = apply_packet_sent_events(packet_batch, &player, &pending_bytes).await;
 
                 let mut packets_to_frame = VecDeque::from(packet_batch);
                 let mut written_packets = Vec::with_capacity(packets_to_frame.len());
