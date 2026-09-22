@@ -1,6 +1,9 @@
 name: PlayAsia lobby build
 
 on:
+  push:
+    branches:
+      - fix/pjm-packet-sent
   workflow_dispatch:
 
 env:
