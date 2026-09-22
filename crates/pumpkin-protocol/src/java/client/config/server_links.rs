@@ -1,14 +1,18 @@
 use crate::Link;
 use pumpkin_data::packet::clientbound::config::SERVER_LINKS;
-use pumpkin_macros::java_packet;
 
-use crate::ClientPacket;
+use crate::{ClientPacket, MultiVersionJavaPacket};
 use crate::ser::NetworkWriteExt;
 use pumpkin_util::version::JavaMinecraftVersion;
 
-#[java_packet(SERVER_LINKS)]
 pub struct CConfigServerLinks<'a> {
     pub links: &'a [Link<'a>],
+}
+
+impl MultiVersionJavaPacket for CConfigServerLinks<'_> {
+    fn to_id(version: JavaMinecraftVersion) -> i32 {
+        if version == JavaMinecraftVersion::V_26_2 { 16 } else { SERVER_LINKS.to_id(version) }
+    }
 }
 
 impl<'a> CConfigServerLinks<'a> {

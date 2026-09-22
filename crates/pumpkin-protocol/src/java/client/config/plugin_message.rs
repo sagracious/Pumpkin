@@ -1,18 +1,22 @@
 use std::io::Write;
 
 use pumpkin_data::packet::clientbound::config::CUSTOM_PAYLOAD;
-use pumpkin_macros::java_packet;
 use pumpkin_util::version::JavaMinecraftVersion;
 
 use crate::{
-    ClientPacket,
+    ClientPacket, MultiVersionJavaPacket,
     ser::{NetworkWriteExt, WritingError},
 };
 
-#[java_packet(CUSTOM_PAYLOAD)]
 pub struct CPluginMessage<'a> {
     pub channel: &'a str,
     pub data: &'a [u8],
+}
+
+impl MultiVersionJavaPacket for CPluginMessage<'_> {
+    fn to_id(version: JavaMinecraftVersion) -> i32 {
+        if version == JavaMinecraftVersion::V_26_2 { 2 } else { CUSTOM_PAYLOAD.to_id(version) }
+    }
 }
 
 impl<'a> CPluginMessage<'a> {

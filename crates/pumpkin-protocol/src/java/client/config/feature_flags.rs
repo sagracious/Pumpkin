@@ -1,12 +1,16 @@
 use pumpkin_data::packet::clientbound::config::UPDATE_ENABLED_FEATURES;
-use pumpkin_macros::java_packet;
 use pumpkin_util::version::JavaMinecraftVersion;
 
-use crate::{ClientPacket, ser::NetworkWriteExt};
+use crate::{ClientPacket, MultiVersionJavaPacket, ser::NetworkWriteExt};
 
-#[java_packet(UPDATE_ENABLED_FEATURES)]
 pub struct CFeatureFlags<'a> {
     pub features: &'a [&'a str],
+}
+
+impl MultiVersionJavaPacket for CFeatureFlags<'_> {
+    fn to_id(version: JavaMinecraftVersion) -> i32 {
+        if version == JavaMinecraftVersion::V_26_2 { 12 } else { UPDATE_ENABLED_FEATURES.to_id(version) }
+    }
 }
 
 pub type CUpdateEnabledFeatures<'a> = CFeatureFlags<'a>;

@@ -1,18 +1,22 @@
 use std::io::Write;
 
-use crate::{ClientPacket, WritingError, ser::NetworkWriteExt};
+use crate::{ClientPacket, MultiVersionJavaPacket, WritingError, ser::NetworkWriteExt};
 
 use crate::codec::var_int::VarInt;
 use pumpkin_data::{
     packet::clientbound::config::UPDATE_TAGS,
     tag::{RegistryKey, get_registry_key_tags},
 };
-use pumpkin_macros::java_packet;
 use pumpkin_util::version::JavaMinecraftVersion;
 
-#[java_packet(UPDATE_TAGS)]
 pub struct CUpdateTags<'a> {
     pub tags: &'a [pumpkin_data::tag::RegistryKey],
+}
+
+impl MultiVersionJavaPacket for CUpdateTags<'_> {
+    fn to_id(version: JavaMinecraftVersion) -> i32 {
+        if version == JavaMinecraftVersion::V_26_2 { 13 } else { UPDATE_TAGS.to_id(version) }
+    }
 }
 
 impl<'a> CUpdateTags<'a> {
