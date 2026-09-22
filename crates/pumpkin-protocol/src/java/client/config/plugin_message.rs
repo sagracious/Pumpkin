@@ -15,7 +15,7 @@ pub struct CPluginMessage<'a> {
 
 impl MultiVersionJavaPacket for CPluginMessage<'_> {
     fn to_id(version: JavaMinecraftVersion) -> i32 {
-        if version == JavaMinecraftVersion::V_26_2 { 2 } else { CUSTOM_PAYLOAD.to_id(version) }
+        if version == JavaMinecraftVersion::V_26_2 { 1 } else { CUSTOM_PAYLOAD.to_id(version) }
     }
 }
 

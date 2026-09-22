@@ -11,7 +11,7 @@ pub struct CKnownPacks<'a> {
 
 impl MultiVersionJavaPacket for CKnownPacks<'_> {
     fn to_id(version: JavaMinecraftVersion) -> i32 {
-        if version == JavaMinecraftVersion::V_26_2 { 7 } else { SELECT_KNOWN_PACKS.to_id(version) }
+        if version == JavaMinecraftVersion::V_26_2 { 14 } else { SELECT_KNOWN_PACKS.to_id(version) }
     }
 }
 
