@@ -6,7 +6,7 @@ use crate::VarInt;
 use crate::ser::NetworkWriteExt;
 use pumpkin_util::version::JavaMinecraftVersion;
 
-#[java_packet(TICKING_STEP, 128)]
+#[java_packet(TICKING_STEP)]
 pub struct CTickingStep {
     pub tick_steps: VarInt,
 }

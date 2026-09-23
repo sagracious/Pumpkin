@@ -227,6 +227,36 @@ async fn apply_packet_sent_events(
             continue;
         };
         let payload = Bytes::copy_from_slice(encoded);
+        // These packets are produced with the native 26.3 IDs, but the PJM
+        // event sees those same IDs as other 26.3 packet types after a core
+        // pre-translation. Rewrite them here and skip PJM to avoid a second
+        // translation of the already-targeted 26.2 IDs.
+        if player_present
+            && player
+                .as_ref()
+                .is_some_and(|p| p.client.java_version() == JavaMinecraftVersion::V_26_2)
+        {
+            let target_id = match packet_id {
+                130 => Some(127),
+                131 => Some(128),
+                _ => None,
+            };
+            if let Some(target_id) = target_id {
+                let mut rewritten = Vec::with_capacity(packet.data.len());
+                if rewritten.write_var_int(&VarInt(target_id)).is_ok() {
+                    rewritten.extend_from_slice(&payload);
+                    let old_len = packet.data.len();
+                    packet.data = Bytes::from(rewritten);
+                    if packet.data.len() > old_len {
+                        pending_bytes.fetch_add(packet.data.len() - old_len, Ordering::AcqRel);
+                    } else {
+                        decrement_pending_bytes(pending_bytes, old_len - packet.data.len());
+                    }
+                }
+                translated.push(packet);
+                continue;
+            }
+        }
         if (128..=136).contains(&packet_id) {
             debug!(
                 packet_id,
