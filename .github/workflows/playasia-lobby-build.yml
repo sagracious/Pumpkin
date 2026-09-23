@@ -34,7 +34,7 @@ jobs:
           # tiny protocol edit rebuilt every local crate from scratch.
           # Bump this when the iterative profile changes so old release/LTO
           # artifacts are not restored and recompiled under a new fingerprint.
-          prefix-key: v3-playasia-lobby
+          prefix-key: v2-playasia-lobby
           # sccache below owns workspace compiler outputs; keep this cache for
           # Cargo's registry and git dependencies only.
           cache-workspace-crates: false
