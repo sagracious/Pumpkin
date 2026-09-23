@@ -66,7 +66,59 @@ impl LightData {
         }
     }
 
+    fn trim_to_max_words(&mut self, max_words: usize) {
+        fn trim_mask(mask: &BitSet, max_words: usize) -> BitSet {
+            BitSet::from_longs(mask.0.iter().copied().take(max_words).collect())
+        }
+
+        fn trim_arrays(mask: &BitSet, arrays: &[Vec<u8>], max_words: usize) -> Vec<Vec<u8>> {
+            let mut kept = Vec::new();
+            let mut array_index = 0;
+            for bit in 0..mask.0.len() * 64 {
+                if mask.get_bit(bit) {
+                    if bit / 64 < max_words {
+                        if let Some(array) = arrays.get(array_index) {
+                            kept.push(array.clone());
+                        }
+                    }
+                    array_index += 1;
+                }
+            }
+            kept
+        }
+
+        self.sky_light_arrays = trim_arrays(
+            &self.sky_light_mask,
+            &self.sky_light_arrays,
+            max_words,
+        );
+        self.block_light_arrays = trim_arrays(
+            &self.block_light_mask,
+            &self.block_light_arrays,
+            max_words,
+        );
+        self.sky_light_mask = trim_mask(&self.sky_light_mask, max_words);
+        self.block_light_mask = trim_mask(&self.block_light_mask, max_words);
+        self.empty_sky_light_mask = trim_mask(&self.empty_sky_light_mask, max_words);
+        self.empty_block_light_mask = trim_mask(&self.empty_block_light_mask, max_words);
+    }
+
     pub fn write(
+        &self,
+        mut write: impl Write,
+        version: &JavaMinecraftVersion,
+    ) -> Result<(), WritingError> {
+        if *version == JavaMinecraftVersion::V_26_2 {
+            let mut trimmed = self.clone();
+            // Vanilla 26.2 rejects masks longer than 12 longs. The imported
+            // Paper world can expose a much taller synthetic light array.
+            trimmed.trim_to_max_words(12);
+            return trimmed.write_internal(&mut write, version);
+        }
+        self.write_internal(&mut write, version)
+    }
+
+    fn write_internal(
         &self,
         mut write: impl Write,
         version: &JavaMinecraftVersion,
