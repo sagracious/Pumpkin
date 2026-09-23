@@ -236,6 +236,14 @@ async fn apply_packet_sent_events(
                 .as_ref()
                 .is_some_and(|p| p.client.java_version() == JavaMinecraftVersion::V_26_2)
         {
+            // The 26.3 cursor-item packet carries the newer item-component
+            // shape. It is not needed by the lobby during join, and the
+            // 26.2 client rejects the empty cursor payload. Drop only this
+            // nonessential packet for 26.2 clients.
+            if packet_id == 98 {
+                decrement_pending_bytes(pending_bytes, packet.data.len());
+                continue;
+            }
             let target_id = match packet_id {
                 130 => Some(127),
                 131 => Some(128),
