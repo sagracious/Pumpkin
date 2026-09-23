@@ -145,6 +145,20 @@ struct OutgoingPacket {
 
 const MAX_FRAME_BATCH_DATA_SIZE: usize = MAX_PACKET_SIZE as usize;
 
+/// Fallback source-to-target packet IDs for a 26.2 client when PJM leaves a
+/// packet unchanged. ViaBackwards' packet-type provider derives this table
+/// from packet names; these three ranges are the exact 26.3 -> 26.2 shifts
+/// from Pumpkin's generated packet tables. Payload rewrites still belong to
+/// PJM and run first.
+fn fallback_v262_packet_id(packet_id: i32) -> Option<i32> {
+    match packet_id {
+        38..=82 => Some(packet_id - 1),
+        84..=122 => Some(packet_id - 2),
+        124..=143 => Some(packet_id - 3),
+        _ => None,
+    }
+}
+
 fn take_frame_batch(packets: &mut VecDeque<OutgoingPacket>) -> Vec<OutgoingPacket> {
     let mut batch = Vec::new();
     let mut data_len = 0usize;
@@ -304,6 +318,44 @@ async fn apply_packet_sent_events(
         if event.cancelled {
             decrement_pending_bytes(pending_bytes, packet.data.len());
             continue;
+        }
+
+        // PJM owns payload conversion. If it did not rewrite this 26.3
+        // packet, apply only the source/target ID mapping as ViaBackwards does
+        // through its packet-type provider. This covers packets emitted before
+        // a typed PJM handler is available, such as entity velocity (103→101)
+        // during the initial spawn sequence. The three 26.3-only packets below
+        // are cancelled when PJM has no handler rather than being misread as a
+        // different 26.2 packet.
+        if is_v262
+            && event.packet_id == packet_id
+            && event.payload.as_ref() == encoded
+        {
+            if matches!(packet_id, 37 | 83 | 123) {
+                decrement_pending_bytes(pending_bytes, packet.data.len());
+                continue;
+            }
+            if let Some(target_id) = fallback_v262_packet_id(packet_id) {
+                debug!(
+                    raw_packet_id = packet_id,
+                    target_packet_id = target_id,
+                    payload_len = payload.len(),
+                    "Applying fallback 26.2 packet-type mapping after PJM"
+                );
+                let mut rewritten = Vec::with_capacity(packet.data.len());
+                if rewritten.write_var_int(&VarInt(target_id)).is_ok() {
+                    rewritten.extend_from_slice(&payload);
+                    let old_len = packet.data.len();
+                    packet.data = Bytes::from(rewritten);
+                    if packet.data.len() > old_len {
+                        pending_bytes.fetch_add(packet.data.len() - old_len, Ordering::AcqRel);
+                    } else {
+                        decrement_pending_bytes(pending_bytes, old_len - packet.data.len());
+                    }
+                }
+                translated.push(packet);
+                continue;
+            }
         }
         if event.packet_id != packet_id || event.payload.as_ref() != encoded {
             let mut rewritten = Vec::with_capacity(event.payload.len() + 5);
