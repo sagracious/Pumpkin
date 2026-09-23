@@ -15,7 +15,9 @@ use crate::{
 /// This is one of the largest and most important packets in the protocol. It
 /// initializes the player's world view, dimension settings, and local game
 /// rules. Once received, the client begins rendering the world.
-#[java_packet(LOGIN)]
+// 26.2 inserted a play packet before Login, so Login is 49 there and 50 in
+// 26.3. The optional second argument is the 26.2 ID override.
+#[java_packet(LOGIN, 49)]
 pub struct CLogin<'a> {
     /// The unique ID assigned to the player for the current session.
     pub entity_id: i32,

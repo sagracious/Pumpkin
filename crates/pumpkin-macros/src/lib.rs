@@ -268,7 +268,7 @@ pub fn send_cancellable_blocking(input: TokenStream) -> TokenStream {
 /// Attaches a fixed packet ID to a struct implementing `Packet`.
 ///
 /// # Arguments
-/// - `args` – The `TokenStream` representing the packet ID expression.
+/// - `args` – The packet ID expression.
 /// - `item` – The input `TokenStream` representing the struct to implement `Packet` for.
 #[proc_macro_attribute]
 pub fn packet(args: TokenStream, item: TokenStream) -> TokenStream {
@@ -290,15 +290,36 @@ pub fn packet(args: TokenStream, item: TokenStream) -> TokenStream {
 /// Attaches a multi-version packet ID to a struct implementing `MultiVersionJavaPacket`.
 ///
 /// # Arguments
-/// - `args` – The `TokenStream` representing the packet ID expression.
+/// - `args` – The packet ID expression, optionally followed by the packet ID
+///   used by 26.2 when that protocol inserted or removed a packet.
 /// - `item` – The input `TokenStream` representing the struct to implement the trait for.
 #[proc_macro_attribute]
 pub fn java_packet(args: TokenStream, item: TokenStream) -> TokenStream {
-    let packet_id_expr = parse_macro_input!(args as Expr);
+    let packet_id_args = parse_macro_input!(args with syn::punctuated::Punctuated::<Expr, syn::Token![,]>::parse_terminated);
+    let mut packet_id_args = packet_id_args.into_iter();
+    let packet_id_expr = packet_id_args
+        .next()
+        .expect("java_packet requires a packet ID expression");
+    let version_26_2_id = packet_id_args.next();
+    if packet_id_args.next().is_some() {
+        panic!("java_packet accepts at most one 26.2 packet ID override");
+    }
     let ast = parse_macro_input!(item as DeriveInput);
 
     let name = &ast.ident;
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
+
+    let to_id = if let Some(version_26_2_id) = version_26_2_id {
+        quote! {
+            if version == pumpkin_util::version::JavaMinecraftVersion::V_26_2 {
+                #version_26_2_id
+            } else {
+                #packet_id_expr.to_id(version)
+            }
+        }
+    } else {
+        quote! { #packet_id_expr.to_id(version) }
+    };
 
     quote! {
         #ast
@@ -306,7 +327,7 @@ pub fn java_packet(args: TokenStream, item: TokenStream) -> TokenStream {
             #[must_use]
             #[inline]
             fn to_id(version: pumpkin_util::version::JavaMinecraftVersion) -> i32 {
-                #packet_id_expr.to_id(version)
+                #to_id
             }
         }
     }
