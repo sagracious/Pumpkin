@@ -119,12 +119,13 @@ strip = "debuginfo"
 codegen-units = 1
 
 # The PlayAsia lobby is built repeatedly from GitHub Actions while protocol
-# compatibility is being iterated. Thin LTO, multiple codegen units, and
-# incremental compilation keep those rebuilds practical while retaining the
-# release profile's optimization level and stripped debuginfo.
+# compatibility is being iterated. Multiple codegen units and incremental
+# compilation keep those rebuilds practical. LTO stays off here because its
+# final link dominates every iterative CI build; the upstream release profile
+# remains unchanged for production-quality full-LTO releases.
 [profile.playasia-lobby]
 inherits = "release"
-lto = "thin"
+lto = false
 codegen-units = 16
 incremental = true
 
