@@ -214,6 +214,7 @@ async fn apply_packet_sent_events(
     packets: Vec<OutgoingPacket>,
     player_store: &Arc<ArcSwap<Option<Arc<Player>>>>,
     pending_bytes: &Arc<AtomicUsize>,
+    version: JavaMinecraftVersion,
 ) -> Vec<OutgoingPacket> {
     let player = player_store.load_full();
     let player_present = player.is_some();
@@ -226,6 +227,13 @@ async fn apply_packet_sent_events(
             continue;
         };
         let payload = Bytes::copy_from_slice(encoded);
+        // Cursor contents can be queued during spawn before the Player handle
+        // is published. Use the negotiated connection version here so the
+        // 26.2 join guard does not depend on player context.
+        if version == JavaMinecraftVersion::V_26_2 && packet_id == 98 {
+            decrement_pending_bytes(pending_bytes, packet.data.len());
+            continue;
+        }
         // These packets are produced with the native 26.3 IDs, but the PJM
         // event sees those same IDs as other 26.3 packet types after a core
         // pre-translation. Rewrite them here and skip PJM to avoid a second
@@ -270,7 +278,10 @@ async fn apply_packet_sent_events(
                 packet_id,
                 payload_len = payload.len(),
                 player_present,
-                version = ?player.as_ref().as_ref().map(|p| p.client.java_version()),
+                version = ?player
+                    .as_ref()
+                    .as_ref()
+                    .map_or(version, |p| p.client.java_version()),
                 "Tracing clientbound play packet for 26.2 diagnosis"
             );
         }
@@ -852,6 +863,7 @@ impl JavaClient {
         let close_token = self.close_token.clone();
         let pending_bytes = self.pending_bytes.clone();
         let player = self.player.clone();
+        let version = self.version.load();
         let Some(mut writer) = self
             .network_writer
             .lock()
@@ -897,7 +909,13 @@ impl JavaClient {
                     }
                 }
 
-                let packet_batch = apply_packet_sent_events(packet_batch, &player, &pending_bytes).await;
+                let packet_batch = apply_packet_sent_events(
+                    packet_batch,
+                    &player,
+                    &pending_bytes,
+                    version,
+                )
+                .await;
 
                 let mut packets_to_frame = VecDeque::from(packet_batch);
                 let mut written_packets = Vec::with_capacity(packets_to_frame.len());
