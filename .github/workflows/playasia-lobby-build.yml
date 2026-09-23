@@ -34,11 +34,25 @@ jobs:
           # tiny protocol edit rebuilt every local crate from scratch.
           # Bump this when the iterative profile changes so old release/LTO
           # artifacts are not restored and recompiled under a new fingerprint.
-          prefix-key: v2-playasia-lobby
-          cache-workspace-crates: true
+          prefix-key: v3-playasia-lobby
+          # sccache below owns workspace compiler outputs; keep this cache for
+          # Cargo's registry and git dependencies only.
+          cache-workspace-crates: false
+
+      - name: Run sccache cache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          disable_annotations: true
 
       - name: Build Pumpkin
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          RUSTC_WRAPPER: sccache
         run: cargo build --profile playasia-lobby --package pumpkin --bin pumpkin --locked
+
+      - name: Show compiler cache stats
+        if: always()
+        run: sccache --show-stats
 
       - name: Package binary and hash
         run: |
