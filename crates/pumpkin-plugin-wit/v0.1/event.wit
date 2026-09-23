@@ -360,6 +360,10 @@ interface event {
         packet: serverbound-packet,
         packet-id: s32,
         raw-payload: list<u8>,
+        /// Network protocol version negotiated by this connection; -1 for non-Java clients.
+        protocol-version: s32,
+        /// Java connection state: handshake 0, status 1, login 2, transfer 3, config 4, play 5.
+        connection-state: u8,
         cancelled: bool
     }
 
@@ -368,6 +372,10 @@ interface event {
         packet: clientbound-packet,
         packet-id: s32,
         raw-payload: list<u8>,
+        /// Network protocol version negotiated by this connection; -1 for non-Java clients.
+        protocol-version: s32,
+        /// Java connection state: handshake 0, status 1, login 2, transfer 3, config 4, play 5.
+        connection-state: u8,
         cancelled: bool
     }
 

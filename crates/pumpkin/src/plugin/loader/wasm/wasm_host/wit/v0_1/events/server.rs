@@ -51,11 +51,14 @@ impl ToFromWasmEvent for PacketReceivedEvent {
             }
         };
 
+        let (protocol_version, connection_state) = packet_context(&self.player);
         Event::PacketReceivedEvent(PacketReceivedEventData {
             player: player_res,
             packet,
             packet_id: self.packet_id,
             raw_payload: self.payload.to_vec(),
+            protocol_version,
+            connection_state,
             cancelled: self.cancelled,
         })
     }
@@ -99,11 +102,14 @@ impl ToFromWasmEvent for PacketSentEvent {
             }
         };
 
+        let (protocol_version, connection_state) = packet_context(&self.player);
         Event::PacketSentEvent(PacketSentEventData {
             player: player_res,
             packet,
             packet_id: self.packet_id,
             raw_payload: self.payload.iter().copied().collect(),
+            protocol_version,
+            connection_state,
             cancelled: self.cancelled,
         })
     }
@@ -111,6 +117,7 @@ impl ToFromWasmEvent for PacketSentEvent {
     fn apply_wasm_event(&mut self, event: Event, state: &mut PluginHostState) {
         cleanup_event(&event, state);
         if let Event::PacketSentEvent(data) = event {
+            self.packet_id = data.packet_id;
             self.payload = data.raw_payload.into();
             self.cancelled = data.cancelled;
         }
@@ -122,6 +129,24 @@ impl ToFromWasmEvent for PacketSentEvent {
             }
             _ => panic!("unexpected event type"),
         }
+    }
+}
+
+fn packet_context(player: &crate::entity::player::Player) -> (i32, u8) {
+    match player.client.as_ref() {
+        ClientPlatform::Java(client) => {
+            let protocol_version = client.version.load().protocol_version();
+            let connection_state = match client.connection_state.load() {
+                pumpkin_protocol::ConnectionState::HandShake => 0,
+                pumpkin_protocol::ConnectionState::Status => 1,
+                pumpkin_protocol::ConnectionState::Login => 2,
+                pumpkin_protocol::ConnectionState::Transfer => 3,
+                pumpkin_protocol::ConnectionState::Config => 4,
+                pumpkin_protocol::ConnectionState::Play => 5,
+            };
+            (protocol_version, connection_state)
+        }
+        ClientPlatform::Bedrock(_) => (-1, 0),
     }
 }
 

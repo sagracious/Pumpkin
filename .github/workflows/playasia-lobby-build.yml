@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - fix/pjm-packet-sent
+      - feat/pjm-event-context
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
