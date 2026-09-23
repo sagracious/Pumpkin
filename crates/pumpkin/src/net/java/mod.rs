@@ -253,6 +253,10 @@ async fn apply_packet_sent_events(
                 continue;
             }
             let target_id = match packet_id {
+                46 => Some(45),
+                47 => Some(46),
+                48 => Some(47),
+                49 => Some(48),
                 96 => Some(94),
                 97 => Some(95),
                 130 => Some(127),
