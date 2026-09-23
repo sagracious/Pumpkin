@@ -218,6 +218,7 @@ async fn apply_packet_sent_events(
 ) -> Vec<OutgoingPacket> {
     let player = player_store.load_full();
     let player_present = player.is_some();
+    let is_v262 = version == JavaMinecraftVersion::V_26_2;
 
     let mut translated = Vec::with_capacity(packets.len());
     for mut packet in packets {
@@ -227,23 +228,14 @@ async fn apply_packet_sent_events(
             continue;
         };
         let payload = Bytes::copy_from_slice(encoded);
-        // Cursor contents can be queued during spawn before the Player handle
-        // is published. Use the negotiated connection version here so the
-            // 26.2 join guard does not depend on player context.
-            if version == JavaMinecraftVersion::V_26_2 && packet_id == 98 {
-                decrement_pending_bytes(pending_bytes, packet.data.len());
-                continue;
-            }
-        // These packets are produced with the native 26.3 IDs, but the PJM
-        // event sees those same IDs as other 26.3 packet types after a core
-        // pre-translation. Rewrite them here and skip PJM to avoid a second
-        // translation of the already-targeted 26.2 IDs.
-        if player_present
-            && player
-                .as_ref()
-                .as_ref()
-                .is_some_and(|p| p.client.java_version() == JavaMinecraftVersion::V_26_2)
-        {
+        // These packets are produced with the native 26.3 IDs. Apply the
+        // 26.2 rewrite from the negotiated connection version before checking
+        // player context: the first spawn/chunk packets can be queued while
+        // the Player handle is still being published. If those packets reach
+        // PJM first, a 26.3 chunk packet can be reinterpreted as 26.2 light
+        // data (ID 48), which leaves the client reading the chunk body as a
+        // LongArray length.
+        if is_v262 {
             // The 26.3 cursor-item packet carries the newer item-component
             // shape. It is not needed by the lobby during join, and the
             // 26.2 client rejects the empty cursor payload. Drop only this
@@ -264,6 +256,13 @@ async fn apply_packet_sent_events(
                 _ => None,
             };
             if let Some(target_id) = target_id {
+                debug!(
+                    raw_packet_id = packet_id,
+                    target_packet_id = target_id,
+                    payload_len = payload.len(),
+                    player_present,
+                    "Rewriting native 26.3 clientbound packet for 26.2"
+                );
                 let mut rewritten = Vec::with_capacity(packet.data.len());
                 if rewritten.write_var_int(&VarInt(target_id)).is_ok() {
                     rewritten.extend_from_slice(&payload);
@@ -279,7 +278,10 @@ async fn apply_packet_sent_events(
                 continue;
             }
         }
-        if (90..=110).contains(&packet_id) || (120..=140).contains(&packet_id) {
+        if (40..=60).contains(&packet_id)
+            || (90..=110).contains(&packet_id)
+            || (120..=140).contains(&packet_id)
+        {
             debug!(
                 packet_id,
                 payload_len = payload.len(),
