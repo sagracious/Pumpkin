@@ -15,9 +15,11 @@ use crate::{
 /// This is one of the largest and most important packets in the protocol. It
 /// initializes the player's world view, dimension settings, and local game
 /// rules. Once received, the client begins rendering the world.
-// 26.2 inserted a play packet before Login, so Login is 49 there and 50 in
-// 26.3. The optional second argument is the 26.2 ID override.
-#[java_packet(LOGIN, 49)]
+// Keep the packet on Pumpkin's native 26.3 ID here. The outbound 26.2
+// translator maps the source Login ID (50) to the target Login ID (49) after
+// serialization, just like ViaBackwards' source/target packet type mapping.
+// Serializing it as 49 up front collides with native 26.3 Light Update (49).
+#[java_packet(LOGIN)]
 pub struct CLogin<'a> {
     /// The unique ID assigned to the player for the current session.
     pub entity_id: i32,
