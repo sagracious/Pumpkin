@@ -650,6 +650,7 @@ pub fn read_data(id: DataComponent, data: &NbtTag) -> Option<Box<dyn DataCompone
         DataComponent::CanPlaceOn => Some(CanPlaceOnImpl::read_data(data)?.to_dyn()),
         DataComponent::CanBreak => Some(CanBreakImpl::read_data(data)?.to_dyn()),
         DataComponent::AttackAnimation => Some(SwingAnimationImpl::read_data(data)?.to_dyn()),
+        DataComponent::InteractAnimation => Some(SwingAnimationImpl::read_data(data)?.to_dyn()),
         DataComponent::Rarity => Some(RarityImpl::read_data(data)?.to_dyn()),
         DataComponent::BannerPatterns => Some(BannerPatternsImpl::read_data(data)?.to_dyn()),
         DataComponent::UseEffects => Some(UseEffectsImpl::read_data(data)?.to_dyn()),

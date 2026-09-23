@@ -984,6 +984,7 @@ pub fn deserialize(
         DataComponent::PiercingWeapon => Ok(PiercingWeaponImpl::deserialize(seq)?.to_dyn()),
         DataComponent::KineticWeapon => Ok(KineticWeaponImpl::deserialize(seq)?.to_dyn()),
         DataComponent::AttackAnimation => Ok(SwingAnimationImpl::deserialize(seq)?.to_dyn()),
+        DataComponent::InteractAnimation => Ok(SwingAnimationImpl::deserialize(seq)?.to_dyn()),
         DataComponent::AdditionalTradeCost => {
             Ok(AdditionalTradeCostImpl::deserialize(seq)?.to_dyn())
         }
@@ -1136,6 +1137,7 @@ pub fn serialize(
         DataComponent::PiercingWeapon => get::<PiercingWeaponImpl>(value).serialize(seq),
         DataComponent::KineticWeapon => get::<KineticWeaponImpl>(value).serialize(seq),
         DataComponent::AttackAnimation => get::<SwingAnimationImpl>(value).serialize(seq),
+        DataComponent::InteractAnimation => get::<SwingAnimationImpl>(value).serialize(seq),
         DataComponent::AdditionalTradeCost => get::<AdditionalTradeCostImpl>(value).serialize(seq),
         DataComponent::StoredEnchantments => get::<StoredEnchantmentsImpl>(value).serialize(seq),
         DataComponent::Dye => get::<DyeImpl>(value).serialize(seq),
