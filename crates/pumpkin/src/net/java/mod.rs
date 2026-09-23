@@ -313,7 +313,7 @@ async fn apply_packet_sent_events(
             continue;
         };
         let event = player
-            .fire_packet_sent_event_no_obj(packet_id, payload)
+            .fire_packet_sent_event_no_obj(packet_id, payload.clone())
             .await;
         if event.cancelled {
             decrement_pending_bytes(pending_bytes, packet.data.len());
