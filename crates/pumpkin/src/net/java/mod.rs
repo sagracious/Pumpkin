@@ -232,7 +232,7 @@ async fn apply_packet_sent_events(
                 packet_id,
                 payload_len = payload.len(),
                 player_present,
-                version = ?player.as_ref().map(|p| p.client.java_version()),
+                version = ?player.as_ref().as_ref().map(|p| p.client.java_version()),
                 "Tracing clientbound play packet for 26.2 diagnosis"
             );
         }
