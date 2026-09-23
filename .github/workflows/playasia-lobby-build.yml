@@ -4,7 +4,18 @@ on:
   push:
     branches:
       - fix/pjm-packet-sent
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "crates/**"
+      - "assets/**"
+      - ".github/workflows/playasia-lobby-build.yml"
   workflow_dispatch:
+
+concurrency:
+  group: playasia-lobby-build-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -15,23 +26,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        with:
-          submodules: recursive
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          # The previous cache deliberately excluded workspace crates, so each
+          # tiny protocol edit rebuilt every local crate from scratch.
+          prefix-key: v1-playasia-lobby
+          cache-workspace-crates: true
 
       - name: Build Pumpkin
-        run: cargo build --release --locked
+        run: cargo build --profile playasia-lobby --package pumpkin --bin pumpkin --locked
 
       - name: Package binary and hash
         run: |
           mkdir -p dist
-          cp target/release/pumpkin dist/pumpkin
+          cp target/playasia-lobby/pumpkin dist/pumpkin
           sha256sum dist/pumpkin > dist/pumpkin.sha256
 
       - uses: actions/upload-artifact@v7
         with:
           name: pumpkin-playasia-lobby-linux-x64
           path: dist/
-          compression-level: 9
+          compression-level: 1
