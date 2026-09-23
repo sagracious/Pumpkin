@@ -5,7 +5,7 @@ use crate::ClientPacket;
 use crate::ser::NetworkWriteExt;
 use pumpkin_util::version::JavaMinecraftVersion;
 
-#[java_packet(TICKING_STATE)]
+#[java_packet(TICKING_STATE, 127)]
 pub struct CTickingState {
     pub tick_rate: f32,
     pub is_frozen: bool,
