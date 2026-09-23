@@ -273,7 +273,7 @@ async fn apply_packet_sent_events(
                 continue;
             }
         }
-        if (128..=136).contains(&packet_id) {
+        if (90..=110).contains(&packet_id) || (120..=140).contains(&packet_id) {
             debug!(
                 packet_id,
                 payload_len = payload.len(),
