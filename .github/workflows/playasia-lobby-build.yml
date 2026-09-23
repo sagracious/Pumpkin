@@ -32,7 +32,9 @@ jobs:
         with:
           # The previous cache deliberately excluded workspace crates, so each
           # tiny protocol edit rebuilt every local crate from scratch.
-          prefix-key: v1-playasia-lobby
+          # Bump this when the iterative profile changes so old release/LTO
+          # artifacts are not restored and recompiled under a new fingerprint.
+          prefix-key: v2-playasia-lobby
           cache-workspace-crates: true
 
       - name: Build Pumpkin
