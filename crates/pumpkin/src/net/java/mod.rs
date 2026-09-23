@@ -234,6 +234,7 @@ async fn apply_packet_sent_events(
         if player_present
             && player
                 .as_ref()
+                .as_ref()
                 .is_some_and(|p| p.client.java_version() == JavaMinecraftVersion::V_26_2)
         {
             let target_id = match packet_id {
