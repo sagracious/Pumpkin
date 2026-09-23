@@ -1,3 +1,4 @@
+use super::block_state_26_2::remap_block_state;
 use super::util::write_compound_nbt;
 use pumpkin_protocol::codec::bit_set::BitSet;
 use pumpkin_protocol::codec::var_int::VarInt;
@@ -93,7 +94,36 @@ pub fn write_chunk_data(
                 blocks_and_biomes_buf.write_i16_be(liquid_count)?;
             }
 
-            let block_network = block_palette.convert_network();
+            let mut block_network = block_palette.convert_network();
+            if version == &JavaMinecraftVersion::V_26_2 {
+                match &mut block_network.palette {
+                    NetworkPalette::Single(registry_id) => {
+                        *registry_id = remap_block_state(*registry_id as u16).into();
+                    }
+                    NetworkPalette::Indirect(palette) => {
+                        for registry_id in palette.iter_mut() {
+                            *registry_id = remap_block_state(*registry_id as u16).into();
+                        }
+                    }
+                    NetworkPalette::Direct => {
+                        let bits_per_entry = usize::from(block_network.bits_per_entry);
+                        let values_per_i64 = 64 / bits_per_entry;
+                        let id_mask = (1u64 << bits_per_entry) - 1;
+
+                        for packed_word in &mut block_network.packed_data {
+                            let mut remapped_word = 0u64;
+                            let packed_word_u64 = *packed_word as u64;
+                            for index in 0..values_per_i64 {
+                                let shift = index * bits_per_entry;
+                                let state_id = ((packed_word_u64 >> shift) & id_mask) as u16;
+                                let remapped_id = remap_block_state(state_id);
+                                remapped_word |= u64::from(remapped_id) << shift;
+                            }
+                            *packed_word = remapped_word as i64;
+                        }
+                    }
+                }
+            }
             blocks_and_biomes_buf.write_u8(block_network.bits_per_entry)?;
 
             match block_network.palette {
