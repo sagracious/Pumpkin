@@ -229,6 +229,14 @@ async fn apply_packet_sent_events(
             continue;
         };
         let payload = Bytes::copy_from_slice(encoded);
+        if packet_id == 133 {
+            debug!(
+                packet_id,
+                payload_len = payload.len(),
+                version = ?player.client.java_version(),
+                "Tracing clientbound update_advancements packet"
+            );
+        }
         let event = player
             .fire_packet_sent_event_no_obj(packet_id, payload)
             .await;
