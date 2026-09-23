@@ -229,11 +229,18 @@ async fn apply_packet_sent_events(
         let payload = Bytes::copy_from_slice(encoded);
         // Cursor contents can be queued during spawn before the Player handle
         // is published. Use the negotiated connection version here so the
-        // 26.2 join guard does not depend on player context.
-        if version == JavaMinecraftVersion::V_26_2 && packet_id == 98 {
-            decrement_pending_bytes(pending_bytes, packet.data.len());
-            continue;
-        }
+            // 26.2 join guard does not depend on player context.
+            if version == JavaMinecraftVersion::V_26_2 && packet_id == 98 {
+                decrement_pending_bytes(pending_bytes, packet.data.len());
+                continue;
+            }
+            // Imported 26.3 Lobby chunks can expose an oversized standalone
+            // light mask. The chunk packet still carries its own lighting;
+            // omit only the redundant standalone update for 26.2 joins.
+            if version == JavaMinecraftVersion::V_26_2 && packet_id == 49 {
+                decrement_pending_bytes(pending_bytes, packet.data.len());
+                continue;
+            }
         // These packets are produced with the native 26.3 IDs, but the PJM
         // event sees those same IDs as other 26.3 packet types after a core
         // pre-translation. Rewrite them here and skip PJM to avoid a second
