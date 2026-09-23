@@ -293,7 +293,8 @@ async fn apply_packet_sent_events(
                 continue;
             }
         }
-        if (40..=60).contains(&packet_id)
+        if (0..=40).contains(&packet_id)
+            || (40..=60).contains(&packet_id)
             || (90..=110).contains(&packet_id)
             || (120..=140).contains(&packet_id)
         {
@@ -318,6 +319,16 @@ async fn apply_packet_sent_events(
         if event.cancelled {
             decrement_pending_bytes(pending_bytes, packet.data.len());
             continue;
+        }
+
+        if is_v262 && packet_id <= 40 {
+            debug!(
+                raw_packet_id = packet_id,
+                translated_packet_id = event.packet_id,
+                raw_payload_len = payload.len(),
+                translated_payload_len = event.payload.len(),
+                "Tracing low-ID 26.2 packet after PJM"
+            );
         }
 
         // PJM owns payload conversion. If it did not rewrite this 26.3
