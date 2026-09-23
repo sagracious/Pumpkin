@@ -217,9 +217,7 @@ async fn apply_packet_sent_events(
     pending_bytes: &Arc<AtomicUsize>,
 ) -> Vec<OutgoingPacket> {
     let player = player_store.load_full();
-    let Some(player) = player.as_ref() else {
-        return packets;
-    };
+    let player_present = player.is_some();
 
     let mut translated = Vec::with_capacity(packets.len());
     for mut packet in packets {
@@ -229,14 +227,19 @@ async fn apply_packet_sent_events(
             continue;
         };
         let payload = Bytes::copy_from_slice(encoded);
-        if packet_id == 133 {
+        if (128..=136).contains(&packet_id) {
             debug!(
                 packet_id,
                 payload_len = payload.len(),
-                version = ?player.client.java_version(),
-                "Tracing clientbound update_advancements packet"
+                player_present,
+                version = ?player.as_ref().map(|p| p.client.java_version()),
+                "Tracing clientbound play packet for 26.2 diagnosis"
             );
         }
+        let Some(player) = player.as_ref() else {
+            translated.push(packet);
+            continue;
+        };
         let event = player
             .fire_packet_sent_event_no_obj(packet_id, payload)
             .await;
