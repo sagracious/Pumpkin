@@ -61,12 +61,17 @@ impl LpVector3d {
     pub fn read<R: std::io::Read>(reader: &mut R) -> Result<Self, ReadingError> {
         let mut low_16 = [0u8; 2];
         reader
-            .read_exact(&mut low_16)
+            .read_exact(&mut low_16[..1])
             .map_err(|e| ReadingError::Message(e.to_string()))?;
 
-        if low_16[0] == 0 && low_16[1] == 0 {
+        // Zero velocity is encoded as a single zero byte by `write`.
+        if low_16[0] == 0 {
             return Ok(Self(Vector3::new(0.0, 0.0, 0.0)));
         }
+
+        reader
+            .read_exact(&mut low_16[1..])
+            .map_err(|e| ReadingError::Message(e.to_string()))?;
 
         let mut mid_32 = [0u8; 4];
         reader
@@ -157,6 +162,32 @@ mod tests {
         assert_eq!(encode_legacy_velocity_component(-0.5), -4000);
         assert_eq!(encode_legacy_velocity_component(4.0), 31200);
         assert_eq!(encode_legacy_velocity_component(-4.0), -31200);
+    }
+
+    #[test]
+    fn zero_velocity_round_trips_through_the_single_byte_sentinel() {
+        let zero = LpVector3d(Vector3::new(0.0, 0.0, 0.0));
+        let mut encoded = Vec::new();
+        zero.write(&mut encoded).unwrap();
+        assert_eq!(encoded, [0]);
+
+        let mut read = encoded.as_slice();
+        assert_eq!(LpVector3d::read(&mut read).unwrap(), zero);
+        assert!(read.is_empty());
+    }
+
+    #[test]
+    fn nonzero_velocity_still_round_trips_after_the_sentinel() {
+        let velocity = LpVector3d(Vector3::new(0.5, -0.5, 0.25));
+        let mut encoded = Vec::new();
+        velocity.write(&mut encoded).unwrap();
+
+        let mut read = encoded.as_slice();
+        let decoded = LpVector3d::read(&mut read).unwrap();
+        assert!(read.is_empty());
+        assert!((decoded.0.x - velocity.0.x).abs() < 0.001);
+        assert!((decoded.0.y - velocity.0.y).abs() < 0.001);
+        assert!((decoded.0.z - velocity.0.z).abs() < 0.001);
     }
 
     #[test]
