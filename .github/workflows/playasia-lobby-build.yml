@@ -5,6 +5,7 @@ on:
     branches:
       - fix/pjm-packet-sent
       - feat/pjm-event-context
+      - feat/pjm-raw-packet-events
     paths:
       - "Cargo.toml"
       - "Cargo.lock"

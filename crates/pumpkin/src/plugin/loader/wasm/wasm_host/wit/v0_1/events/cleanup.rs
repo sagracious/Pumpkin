@@ -228,6 +228,11 @@ pub fn cleanup_event(event: &Event, state: &mut PluginHostState) {
         Event::PacketSentEvent(data) => {
             cleanup_player(state, &data.player);
         }
+        Event::ProtocolPacketEvent(data) => {
+            if let Some(player) = &data.player {
+                cleanup_player(state, player);
+            }
+        }
         Event::ChunkLoadEvent(data) => {
             cleanup_world(state, &data.target_world);
         }

@@ -34,7 +34,11 @@ impl PendingConnection {
             let has_packet_plugin = server
                 .plugin_manager
                 .has_handlers::<crate::plugin::server::packet::PacketReceivedEvent>(
-            );
+            ) || server
+                .plugin_manager
+                .has_handlers::<
+                    crate::plugin::api::events::server::protocol_packet::ProtocolPacketEvent,
+                >();
             let allows_client = has_packet_plugin
                 && JavaMinecraftVersion::from_protocol(version) != JavaMinecraftVersion::Unknown;
 

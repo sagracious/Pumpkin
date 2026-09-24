@@ -590,7 +590,7 @@ impl PumpkinServer {
                                 },
                                 PacketHandlerResult::ReadyToPlay(profile, config) => {
                                      let mut java_client = JavaClient::from_pending(pending, profile.clone(), config.clone());
-                                     java_client.start_outgoing_packet_task();
+                                     java_client.start_outgoing_packet_task(&server_clone);
 
                                      if let Some((player, world)) = server_clone
                                          .add_player(Arc::new(ClientPlatform::Java(java_client)), profile, Some(config))

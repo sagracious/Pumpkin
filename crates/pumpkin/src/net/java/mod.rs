@@ -71,6 +71,9 @@ use crate::net::{
     ClientPlatform, GameProfile, MAX_PENDING_BYTES, PacketRateLimiter, PlayerConfig,
     decrement_pending_bytes,
 };
+use crate::plugin::api::events::server::protocol_packet::{
+    PacketDirection, PacketTranslationOutput, ProtocolPacketEvent,
+};
 use crate::plugin::api::events::world::chunk_send::ChunkSend;
 use crate::plugin::player::player_custom_payload::PlayerCustomPayloadEvent;
 use crate::{error::PumpkinError, server::Server};
@@ -141,23 +144,10 @@ pub enum OutgoingPacketType {
 struct OutgoingPacket {
     data: Bytes,
     completion: Option<oneshot::Sender<()>>,
+    translation_applied: bool,
 }
 
 const MAX_FRAME_BATCH_DATA_SIZE: usize = MAX_PACKET_SIZE as usize;
-
-/// Fallback source-to-target packet IDs for a 26.2 client when PJM leaves a
-/// packet unchanged. ViaBackwards' packet-type provider derives this table
-/// from packet names; these three ranges are the exact 26.3 -> 26.2 shifts
-/// from Pumpkin's generated packet tables. Payload rewrites still belong to
-/// PJM and run first.
-fn fallback_v262_packet_id(packet_id: i32) -> Option<i32> {
-    match packet_id {
-        38..=82 => Some(packet_id - 1),
-        84..=122 => Some(packet_id - 2),
-        124..=143 => Some(packet_id - 3),
-        _ => None,
-    }
-}
 
 fn take_frame_batch(packets: &mut VecDeque<OutgoingPacket>) -> Vec<OutgoingPacket> {
     let mut batch = Vec::new();
@@ -224,176 +214,191 @@ async fn frame_batch_maybe_offload(
     }
 }
 
+pub(crate) const fn connection_state_code(state: ConnectionState) -> u8 {
+    match state {
+        ConnectionState::HandShake => 0,
+        ConnectionState::Status => 1,
+        ConnectionState::Login => 2,
+        ConnectionState::Transfer => 3,
+        ConnectionState::Config => 4,
+        ConnectionState::Play => 5,
+    }
+}
+
+/// Runs the raw packet hook shared by pending and player-backed connections.
+#[expect(clippy::too_many_arguments)]
+pub(crate) fn apply_protocol_packet_event(
+    server: &Arc<Server>,
+    connection_id: u64,
+    player: Option<Arc<Player>>,
+    direction: PacketDirection,
+    version: JavaMinecraftVersion,
+    state: ConnectionState,
+    packet_id: &mut i32,
+    payload: &mut Bytes,
+    translated: &mut bool,
+    cancelled: &mut bool,
+) -> Vec<PacketTranslationOutput> {
+    if !server.plugin_manager.has_handlers::<ProtocolPacketEvent>() {
+        return Vec::new();
+    }
+
+    let mut event = ProtocolPacketEvent::new(
+        connection_id,
+        player,
+        direction,
+        *packet_id,
+        payload.clone(),
+        version.protocol_version(),
+        connection_state_code(state),
+    );
+    server.plugin_manager.fire_blocking(server, &mut event);
+    *packet_id = event.packet_id;
+    *payload = event.payload;
+    *translated = event.translated;
+    *cancelled = event.cancelled;
+    event.clientbound_packets
+}
+
+fn encode_protocol_packet(packet_id: i32, payload: &[u8]) -> Option<Bytes> {
+    if packet_id < 0 || payload.len() > MAX_PACKET_SIZE as usize {
+        return None;
+    }
+    let mut encoded = Vec::with_capacity(payload.len() + 5);
+    encoded.write_var_int(&VarInt(packet_id)).ok()?;
+    encoded.extend_from_slice(payload);
+    Some(Bytes::from(encoded))
+}
+
 async fn apply_packet_sent_events(
     packets: Vec<OutgoingPacket>,
     player_store: &Arc<ArcSwap<Option<Arc<Player>>>>,
     pending_bytes: &Arc<AtomicUsize>,
     version: JavaMinecraftVersion,
+    connection_id: u64,
+    state: ConnectionState,
+    server: &Arc<Server>,
+    close_token: &CancellationToken,
 ) -> Vec<OutgoingPacket> {
+    const MAX_TRANSLATED_FOLLOW_UP_PACKETS: usize = 64;
+
     let player = player_store.load_full();
-    let player_present = player.is_some();
-    let is_v262 = version == JavaMinecraftVersion::V_26_2;
-
-    let mut translated = Vec::with_capacity(packets.len());
+    let player = player.as_ref().clone();
+    let mut translated_packets = Vec::with_capacity(packets.len());
     for mut packet in packets {
+        if packet.translation_applied {
+            translated_packets.push(packet);
+            continue;
+        }
+        let original_len = packet.data.len();
         let mut encoded = packet.data.as_ref();
-        let Ok(packet_id) = encoded.get_var_int().map(|id| id.0) else {
-            translated.push(packet);
+        let Ok(mut packet_id) = encoded.get_var_int().map(|id| id.0) else {
+            translated_packets.push(packet);
             continue;
         };
-        let payload = Bytes::copy_from_slice(encoded);
-        // These packets are produced with the native 26.3 IDs. Apply the
-        // 26.2 rewrite from the negotiated connection version before checking
-        // player context: the first spawn/chunk packets can be queued while
-        // the Player handle is still being published. If those packets reach
-        // PJM first, a 26.3 chunk packet can be reinterpreted as 26.2 light
-        // data (ID 48), which leaves the client reading the chunk body as a
-        // LongArray length.
-        if is_v262 {
-            // The 26.3 cursor-item packet carries the newer item-component
-            // shape. It is not needed by the lobby during join, and the
-            // 26.2 client rejects the empty cursor payload. Drop only this
-            // nonessential packet for 26.2 clients.
-            if packet_id == 98 {
-                decrement_pending_bytes(pending_bytes, packet.data.len());
+        let mut payload = Bytes::copy_from_slice(encoded);
+
+        // Preserve the public PacketSentEvent behavior for plugins that still use it.
+        if let Some(player) = player.as_ref() {
+            let event = player
+                .fire_packet_sent_event_no_obj(packet_id, payload.clone())
+                .await;
+            if event.cancelled {
+                decrement_pending_bytes(pending_bytes, original_len);
                 continue;
             }
-            let target_id = match packet_id {
-                46 => Some(45),
-                47 => Some(46),
-                48 => Some(47),
-                49 => Some(48),
-                50 => Some(49),
-                96 => Some(94),
-                97 => Some(95),
-                130 => Some(127),
-                131 => Some(128),
-                _ => None,
+            packet_id = event.packet_id;
+            payload = event.payload;
+        }
+
+        let mut native_layout = false;
+        let mut cancelled = false;
+        let packet_state = player
+            .as_ref()
+            .and_then(|player| match player.client.as_ref() {
+                ClientPlatform::Java(client) => Some(client.connection_state.load()),
+                ClientPlatform::Bedrock(_) => None,
+            })
+            .unwrap_or(state);
+        let clientbound_packets = apply_protocol_packet_event(
+            server,
+            connection_id,
+            player.clone(),
+            PacketDirection::Clientbound,
+            version,
+            packet_state,
+            &mut packet_id,
+            &mut payload,
+            &mut native_layout,
+            &mut cancelled,
+        );
+        let mut follow_up = Vec::with_capacity(clientbound_packets.len());
+        let mut invalid_output = clientbound_packets.len() > MAX_TRANSLATED_FOLLOW_UP_PACKETS;
+        for follow_up_packet in clientbound_packets {
+            let Some(encoded_follow_up) =
+                encode_protocol_packet(follow_up_packet.packet_id, &follow_up_packet.payload)
+            else {
+                invalid_output = true;
+                break;
             };
-            if let Some(target_id) = target_id {
-                debug!(
-                    raw_packet_id = packet_id,
-                    target_packet_id = target_id,
-                    payload_len = payload.len(),
-                    player_present,
-                    "Rewriting native 26.3 clientbound packet for 26.2"
-                );
-                let mut rewritten = Vec::with_capacity(packet.data.len());
-                if rewritten.write_var_int(&VarInt(target_id)).is_ok() {
-                    rewritten.extend_from_slice(&payload);
-                    let old_len = packet.data.len();
-                    packet.data = Bytes::from(rewritten);
-                    if packet.data.len() > old_len {
-                        pending_bytes.fetch_add(packet.data.len() - old_len, Ordering::AcqRel);
-                    } else {
-                        decrement_pending_bytes(pending_bytes, old_len - packet.data.len());
-                    }
-                }
-                translated.push(packet);
-                continue;
-            }
+            follow_up.push(encoded_follow_up);
         }
-        if (0..=40).contains(&packet_id)
-            || (40..=60).contains(&packet_id)
-            || (90..=110).contains(&packet_id)
-            || (120..=140).contains(&packet_id)
-        {
-            debug!(
-                packet_id,
-                payload_len = payload.len(),
-                player_present,
-                version = ?player
-                    .as_ref()
-                    .as_ref()
-                    .map_or(version, |p| p.client.java_version()),
-                "Tracing clientbound play packet for 26.2 diagnosis"
-            );
-        }
-        let Some(player) = player.as_ref() else {
-            translated.push(packet);
-            continue;
-        };
-        let event = player
-            .fire_packet_sent_event_no_obj(packet_id, payload.clone())
-            .await;
-        if event.cancelled {
-            decrement_pending_bytes(pending_bytes, packet.data.len());
+        if invalid_output {
+            close_token.cancel();
+            decrement_pending_bytes(pending_bytes, original_len);
             continue;
         }
 
-        if is_v262 && packet_id <= 40 {
-            debug!(
-                raw_packet_id = packet_id,
-                translated_packet_id = event.packet_id,
-                raw_payload_len = payload.len(),
-                translated_payload_len = event.payload.len(),
-                "Tracing low-ID 26.2 packet after PJM"
-            );
+        let follow_up_bytes = follow_up.iter().map(Bytes::len).sum::<usize>();
+        if follow_up_bytes > 0 {
+            let previous = pending_bytes.fetch_add(follow_up_bytes, Ordering::AcqRel);
+            if previous.saturating_add(follow_up_bytes) > MAX_PENDING_BYTES {
+                decrement_pending_bytes(pending_bytes, follow_up_bytes);
+                decrement_pending_bytes(pending_bytes, original_len);
+                close_token.cancel();
+                continue;
+            }
         }
 
-        // PJM owns payload conversion. If it did not rewrite this 26.3
-        // packet, apply only the source/target ID mapping as ViaBackwards does
-        // through its packet-type provider. This covers packets emitted before
-        // a typed PJM handler is available, such as entity velocity (103→101)
-        // during the initial spawn sequence. The three 26.3-only packets below
-        // are cancelled when PJM has no handler rather than being misread as a
-        // different 26.2 packet.
-        if is_v262
-            && event.packet_id == packet_id
-            && event.payload.as_ref() == encoded
-        {
-            if matches!(packet_id, 37 | 83 | 123) {
-                decrement_pending_bytes(pending_bytes, packet.data.len());
-                continue;
-            }
-            if let Some(target_id) = fallback_v262_packet_id(packet_id) {
-                debug!(
-                    raw_packet_id = packet_id,
-                    target_packet_id = target_id,
-                    payload_len = payload.len(),
-                    "Applying fallback 26.2 packet-type mapping after PJM"
-                );
-                let mut rewritten = Vec::with_capacity(packet.data.len());
-                if rewritten.write_var_int(&VarInt(target_id)).is_ok() {
-                    rewritten.extend_from_slice(&payload);
-                    let old_len = packet.data.len();
-                    packet.data = Bytes::from(rewritten);
-                    if packet.data.len() > old_len {
-                        pending_bytes.fetch_add(packet.data.len() - old_len, Ordering::AcqRel);
-                    } else {
-                        decrement_pending_bytes(pending_bytes, old_len - packet.data.len());
-                    }
+        if cancelled {
+            decrement_pending_bytes(pending_bytes, original_len);
+        } else {
+            let Some(encoded_main) = encode_protocol_packet(packet_id, &payload) else {
+                if follow_up_bytes > 0 {
+                    decrement_pending_bytes(pending_bytes, follow_up_bytes);
                 }
-                translated.push(packet);
+                decrement_pending_bytes(pending_bytes, original_len);
+                close_token.cancel();
                 continue;
+            };
+            if encoded_main.len() > original_len {
+                pending_bytes.fetch_add(encoded_main.len() - original_len, Ordering::AcqRel);
+            } else {
+                decrement_pending_bytes(pending_bytes, original_len - encoded_main.len());
             }
+            packet.data = encoded_main;
+            packet.translation_applied = true;
+            translated_packets.push(packet);
         }
-        if event.packet_id != packet_id || event.payload.as_ref() != encoded {
-            let mut rewritten = Vec::with_capacity(event.payload.len() + 5);
-            if rewritten
-                .write_var_int(&VarInt(event.packet_id))
-                .is_ok()
-            {
-                rewritten.extend_from_slice(&event.payload);
-                let old_len = packet.data.len();
-                packet.data = Bytes::from(rewritten);
-                if packet.data.len() > old_len {
-                    pending_bytes.fetch_add(packet.data.len() - old_len, Ordering::AcqRel);
-                } else {
-                    decrement_pending_bytes(pending_bytes, old_len - packet.data.len());
-                }
-            }
-        }
-        translated.push(packet);
+
+        translated_packets.extend(follow_up.into_iter().map(OutgoingPacket::normal_translated));
     }
-    translated
+    translated_packets
 }
-
 impl OutgoingPacket {
     const fn normal(data: Bytes) -> Self {
         Self {
             data,
             completion: None,
+            translation_applied: false,
+        }
+    }
+
+    const fn normal_translated(data: Bytes) -> Self {
+        Self {
+            data,
+            completion: None,
+            translation_applied: true,
         }
     }
 
@@ -401,6 +406,7 @@ impl OutgoingPacket {
         Self {
             data,
             completion: Some(completion),
+            translation_applied: false,
         }
     }
 }
@@ -689,8 +695,8 @@ impl JavaClient {
             return;
         }
 
-        // TODO: `PacketSentEvent` hook (outbound choke point): gate `has_handlers` + non-current
-        // version, split id VarInt, `fire_blocking`, re-frame id + payload, drop if cancelled.
+        // The outgoing writer applies ProtocolPacketEvent to this queue entry,
+        // including priority packets, before it frames the bytes.
 
         let packet_len = packet_data.len();
         let prev_bytes = self.pending_bytes.fetch_add(packet_len, Ordering::AcqRel);
@@ -721,6 +727,40 @@ impl JavaClient {
                 );
                 // We now need to close the connection to the client since the stream is in an
                 // unknown state
+                self.close();
+            }
+        }
+    }
+
+    /// Queues a clientbound packet already translated for this connection's negotiated version.
+    pub(crate) fn try_enqueue_translated_packet(&self, packet_id: i32, payload: &[u8]) {
+        if self.close_token.is_cancelled() || packet_id < 0 {
+            return;
+        }
+        let mut data = Vec::with_capacity(payload.len() + 5);
+        if data.write_var_int(&VarInt(packet_id)).is_err() {
+            return;
+        }
+        data.extend_from_slice(payload);
+        let packet = Bytes::from(data);
+        let packet_len = packet.len();
+        let prev_bytes = self.pending_bytes.fetch_add(packet_len, Ordering::AcqRel);
+        let new_bytes = prev_bytes.saturating_add(packet_len);
+        if new_bytes > MAX_PENDING_BYTES {
+            decrement_pending_bytes(&self.pending_bytes, packet_len);
+            self.close();
+            return;
+        }
+        if let Err(err) = self
+            .outgoing_packet_priority_send
+            .send(OutgoingPacket::normal_translated(packet))
+        {
+            decrement_pending_bytes(&self.pending_bytes, packet_len);
+            if !self.close_token.is_cancelled() {
+                warn!(
+                    "Failed to queue translated packet for client {}: {}",
+                    self.id, err
+                );
                 self.close();
             }
         }
@@ -823,7 +863,7 @@ impl JavaClient {
             return;
         }
 
-        // TODO: `PacketSentEvent` hook, as in `try_enqueue_packet_data` (async `fire`).
+        // The outgoing writer applies ProtocolPacketEvent before framing this entry.
 
         let packet_len = packet.len();
         let prev_bytes = self.pending_bytes.fetch_add(packet_len, Ordering::AcqRel);
@@ -923,7 +963,7 @@ impl JavaClient {
     /// - **Login/Transfer:** Handles login and transfer packets.
     /// - **Config:** Handles configuration packets.
     #[expect(clippy::too_many_lines)]
-    pub fn start_outgoing_packet_task(&mut self) {
+    pub fn start_outgoing_packet_task(&mut self, server: &Arc<Server>) {
         const MAX_BATCH_SIZE: usize = 64;
 
         let Some(mut packet_receiver) = self.outgoing_packet_queue_recv.take() else {
@@ -936,6 +976,9 @@ impl JavaClient {
         let pending_bytes = self.pending_bytes.clone();
         let player = self.player.clone();
         let version = self.version.load();
+        let connection_id = self.id;
+        let connection_state = self.connection_state.load();
+        let server = server.clone();
         let Some(mut writer) = self
             .network_writer
             .lock()
@@ -986,6 +1029,10 @@ impl JavaClient {
                     &player,
                     &pending_bytes,
                     version,
+                    connection_id,
+                    connection_state,
+                    &server,
+                    &close_token,
                 )
                 .await;
 
@@ -1076,7 +1123,7 @@ impl JavaClient {
         server: &Arc<Server>,
         packet: &RawPacket,
     ) -> Result<(), Box<dyn PumpkinError>> {
-        let version = self.version.load();
+        let client_version = self.version.load();
 
         let mut event = crate::plugin::server::packet::PacketReceivedEvent::new(
             player.clone(),
@@ -1088,8 +1135,36 @@ impl JavaClient {
             return Ok(());
         }
 
-        let mut payload = &event.payload[..];
-        match event.packet_id {
+        let mut packet_id = event.packet_id;
+        let mut packet_payload = event.payload;
+        let mut translated = false;
+        let mut cancelled = false;
+        let replies = apply_protocol_packet_event(
+            server,
+            self.id,
+            Some(player.clone()),
+            PacketDirection::Serverbound,
+            client_version,
+            self.connection_state.load(),
+            &mut packet_id,
+            &mut packet_payload,
+            &mut translated,
+            &mut cancelled,
+        );
+        for reply in replies {
+            self.try_enqueue_translated_packet(reply.packet_id, &reply.payload);
+        }
+        if cancelled {
+            return Ok(());
+        }
+
+        let version = if translated {
+            CURRENT_MC_VERSION
+        } else {
+            client_version
+        };
+        let mut payload = &packet_payload[..];
+        match packet_id {
             id if id == SConfirmTeleport::to_id(version) => {
                 self.handle_confirm_teleport(
                     player,

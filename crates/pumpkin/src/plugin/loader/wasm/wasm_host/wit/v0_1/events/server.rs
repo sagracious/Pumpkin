@@ -6,8 +6,10 @@ use crate::plugin::{
             events::{ToFromWasmEvent, cleanup_event, consume_text_component},
             generated_packets,
             pumpkin::plugin::event::{
-                ClientboundPacket, Event, MapInitializeEventData, PacketReceivedEventData,
-                PacketSentEventData, ServerBroadcastEventData, ServerCommandEventData,
+                ClientboundPacket, Event, MapInitializeEventData,
+                PacketDirection as WitPacketDirection, PacketReceivedEventData,
+                PacketSentEventData, PacketTranslationOutput as WitPacketTranslationOutput,
+                ProtocolPacketEventData, ServerBroadcastEventData, ServerCommandEventData,
                 ServerListPingAddress, ServerListPingEventData, ServerLoadEventData,
                 ServerLoadType, ServerTickEndEventData, ServerTickStartEventData,
                 ServerboundPacket,
@@ -18,6 +20,7 @@ use crate::plugin::{
         list_ping::ServerListPingEvent,
         map_initialize::MapInitializeEvent,
         packet::{PacketReceivedEvent, PacketSentEvent},
+        protocol_packet::{PacketDirection, PacketTranslationOutput, ProtocolPacketEvent},
         server_broadcast::ServerBroadcastEvent,
         server_command::ServerCommandEvent,
         server_load::{LoadType, ServerLoadEvent},
@@ -126,6 +129,68 @@ impl ToFromWasmEvent for PacketSentEvent {
         match event {
             Event::PacketSentEvent(_) => {
                 panic!("Modifying packets from WASM is not yet supported.");
+            }
+            _ => panic!("unexpected event type"),
+        }
+    }
+}
+
+impl ToFromWasmEvent for ProtocolPacketEvent {
+    fn to_wasm_event(&self, state: &mut PluginHostState) -> Event {
+        let player = self.player.as_ref().map(|player| {
+            state
+                .add_player(player.clone())
+                .expect("failed to add player resource")
+        });
+        Event::ProtocolPacketEvent(ProtocolPacketEventData {
+            connection_id: self.connection_id,
+            player,
+            direction: match self.direction {
+                PacketDirection::Clientbound => WitPacketDirection::Clientbound,
+                PacketDirection::Serverbound => WitPacketDirection::Serverbound,
+            },
+            packet_id: self.packet_id,
+            raw_payload: self.payload.to_vec(),
+            protocol_version: self.protocol_version,
+            connection_state: self.connection_state,
+            translated: self.translated,
+            clientbound_packets: self
+                .clientbound_packets
+                .iter()
+                .map(|packet| WitPacketTranslationOutput {
+                    packet_id: packet.packet_id,
+                    raw_payload: packet.payload.to_vec(),
+                })
+                .collect(),
+            cancelled: self.cancelled,
+        })
+    }
+
+    fn apply_wasm_event(&mut self, event: Event, state: &mut PluginHostState) {
+        cleanup_event(&event, state);
+        if let Event::ProtocolPacketEvent(data) = event {
+            // Connection identity, direction, and negotiated context are host-owned.
+            self.packet_id = data.packet_id;
+            self.payload = data.raw_payload.into();
+            self.translated = data.translated;
+            self.clientbound_packets = data
+                .clientbound_packets
+                .into_iter()
+                .map(|packet| PacketTranslationOutput {
+                    packet_id: packet.packet_id,
+                    payload: packet.raw_payload.into(),
+                })
+                .collect();
+            self.cancelled = data.cancelled;
+        }
+    }
+
+    fn from_wasm_event(event: Event, _state: &mut PluginHostState) -> Self {
+        match event {
+            Event::ProtocolPacketEvent(_) => {
+                panic!(
+                    "Modifying protocol packets from WASM without a host packet context is unsupported."
+                );
             }
             _ => panic!("unexpected event type"),
         }
@@ -325,6 +390,61 @@ mod tests {
     use crate::plugin::loader::wasm::wasm_host::state::TextComponentResource;
     use pumpkin_util::text::TextComponent;
     use wasmtime::component::Resource;
+
+    #[test]
+    fn raw_packet_event_roundtrips_without_a_player_and_keeps_followups_ordered() {
+        let mut state = PluginHostState::new();
+        let mut event = ProtocolPacketEvent::new(
+            42,
+            None,
+            PacketDirection::Serverbound,
+            7,
+            bytes::Bytes::from_static(&[1, 2]),
+            751,
+            5,
+        );
+
+        let outgoing = match event.to_wasm_event(&mut state) {
+            Event::ProtocolPacketEvent(outgoing) => outgoing,
+            _ => {
+                assert!(
+                    false,
+                    "packet translation event should keep its WIT variant"
+                );
+                return;
+            }
+        };
+        assert_eq!(outgoing.connection_id, 42);
+        assert!(outgoing.player.is_none());
+        assert_eq!(outgoing.raw_payload, [1, 2]);
+
+        event.apply_wasm_event(
+            Event::ProtocolPacketEvent(ProtocolPacketEventData {
+                connection_id: 42,
+                player: None,
+                direction: WitPacketDirection::Serverbound,
+                packet_id: 8,
+                raw_payload: vec![3, 4],
+                protocol_version: 751,
+                connection_state: 5,
+                translated: true,
+                clientbound_packets: vec![WitPacketTranslationOutput {
+                    packet_id: 9,
+                    raw_payload: vec![5],
+                }],
+                cancelled: false,
+            }),
+            &mut state,
+        );
+
+        assert_eq!(event.connection_id, 42, "connection identity is host-owned");
+        assert_eq!(event.packet_id, 8);
+        assert_eq!(event.payload.as_ref(), &[3, 4]);
+        assert!(event.translated);
+        assert_eq!(event.clientbound_packets.len(), 1);
+        assert_eq!(event.clientbound_packets[0].packet_id, 9);
+        assert_eq!(event.clientbound_packets[0].payload.as_ref(), &[5]);
+    }
 
     #[test]
     fn server_list_ping_applies_and_consumes_returned_resources() {

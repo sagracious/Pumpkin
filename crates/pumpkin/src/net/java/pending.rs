@@ -1,9 +1,14 @@
-use std::{net::SocketAddr, num::NonZero, sync::Arc};
+use std::{
+    net::SocketAddr,
+    num::NonZero,
+    sync::{Arc, Weak},
+};
 
 use bytes::Bytes;
 use crossbeam::atomic::AtomicCell;
 use pumpkin_config::networking::compression::CompressionInfo;
 use pumpkin_data::packet::CURRENT_MC_VERSION;
+use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_protocol::{
     ClientPacket, ConnectionState, PacketDecodeError, RawPacket, ServerPacket,
     java::{
@@ -18,7 +23,7 @@ use pumpkin_protocol::{
         },
     },
     packet::MultiVersionJavaPacket,
-    ser::ReadingError,
+    ser::{NetworkReadExt, NetworkWriteExt, ReadingError},
 };
 use pumpkin_util::{Hand, text::TextComponent, version::JavaMinecraftVersion};
 use tokio::{
@@ -40,7 +45,8 @@ use crate::{
     server::Server,
 };
 
-use super::JavaClient;
+use super::{JavaClient, apply_protocol_packet_event};
+use crate::plugin::api::events::server::protocol_packet::PacketDirection;
 
 const BRAND_CHANNEL_PREFIX: &str = "minecraft:brand";
 
@@ -56,6 +62,7 @@ const HANDSHAKE_IDLE_TIMEOUT: std::time::Duration = std::time::Duration::from_se
 
 pub struct PendingConnection {
     pub id: u64,
+    server: Weak<Server>,
     pub address: SocketAddr,
     pub server_address: String,
     pub version: AtomicCell<JavaMinecraftVersion>,
@@ -82,6 +89,7 @@ impl PendingConnection {
         let (read, write) = tcp_stream.into_split();
         Self {
             id,
+            server: Weak::new(),
             address,
             server_address: String::new(),
             version: AtomicCell::new(CURRENT_MC_VERSION),
@@ -169,16 +177,71 @@ impl PendingConnection {
     pub async fn send_packet_now<P: ClientPacket>(&mut self, packet: &P) {
         let mut packet_buf = Vec::new();
         if let Err(err) =
-            JavaClient::write_packet_for_version(packet, self.version.load(), &mut packet_buf)
+            JavaClient::write_packet_for_version(packet, CURRENT_MC_VERSION, &mut packet_buf)
         {
             error!("Failed to write packet: {err:?}");
             return;
         }
-        let payload = Bytes::from(packet_buf);
-        if let Err(err) = self.network_writer.write_packet(payload).await {
-            warn!("Failed to send packet to client {}: {}", self.id, err);
+
+        let Some(server) = self.server.upgrade() else {
+            if let Err(err) = self
+                .network_writer
+                .write_packet(Bytes::from(packet_buf))
+                .await
+            {
+                warn!("Failed to send packet to client {}: {}", self.id, err);
+            }
+            let _ = self.network_writer.flush().await;
+            return;
+        };
+
+        let mut encoded = packet_buf.as_slice();
+        let Ok(packet_id) = encoded.get_var_int().map(|id| id.0) else {
+            error!(
+                "Failed to parse encoded clientbound packet for connection {}",
+                self.id
+            );
+            return;
+        };
+        let mut packet_id = packet_id;
+        let mut payload = Bytes::copy_from_slice(encoded);
+        let mut translated = false;
+        let mut cancelled = false;
+        let packets = apply_protocol_packet_event(
+            &server,
+            self.id,
+            None,
+            PacketDirection::Clientbound,
+            self.version.load(),
+            self.connection_state.load(),
+            &mut packet_id,
+            &mut payload,
+            &mut translated,
+            &mut cancelled,
+        );
+
+        if !cancelled {
+            self.write_packet_parts_now(packet_id, &payload).await;
+        }
+        for packet in packets {
+            self.write_packet_parts_now(packet.packet_id, &packet.payload)
+                .await;
         }
         let _ = self.network_writer.flush().await;
+    }
+
+    async fn write_packet_parts_now(&mut self, packet_id: i32, payload: &[u8]) {
+        if packet_id < 0 {
+            return;
+        }
+        let mut encoded = Vec::with_capacity(payload.len() + 5);
+        if encoded.write_var_int(&VarInt(packet_id)).is_err() {
+            return;
+        }
+        encoded.extend_from_slice(payload);
+        if let Err(err) = self.network_writer.write_packet(Bytes::from(encoded)).await {
+            warn!("Failed to send packet to client {}: {}", self.id, err);
+        }
     }
 
     pub async fn kick(&mut self, reason: TextComponent) {
@@ -203,6 +266,7 @@ impl PendingConnection {
     }
 
     pub async fn handle_login_sequence(&mut self, server: &Arc<Server>) -> PacketHandlerResult {
+        self.server = Arc::downgrade(server);
         while let Some(packet) = self.get_packet().await {
             if !self.packet_limiter.check_packet() {
                 warn!(
@@ -247,14 +311,74 @@ impl PendingConnection {
         server: &Arc<Server>,
         packet: &RawPacket,
     ) -> Result<Option<PacketHandlerResult>, ReadingError> {
-        match self.connection_state.load() {
-            ConnectionState::HandShake => self.handle_handshake_packet(server, packet).await,
-            ConnectionState::Status => self.handle_status_packet(server, packet).await,
-            ConnectionState::Login | ConnectionState::Transfer => {
-                self.handle_login_packet(server, packet).await
+        let state = self.connection_state.load();
+        if state == ConnectionState::HandShake && packet.id == 0 {
+            self.read_handshake_version(packet);
+        }
+
+        let mut packet_id = packet.id;
+        let mut payload = packet.payload.clone();
+        let mut translated = false;
+        let mut cancelled = false;
+        let clientbound_packets = apply_protocol_packet_event(
+            server,
+            self.id,
+            None,
+            PacketDirection::Serverbound,
+            self.version.load(),
+            state,
+            &mut packet_id,
+            &mut payload,
+            &mut translated,
+            &mut cancelled,
+        );
+        let has_clientbound_packets = !clientbound_packets.is_empty();
+        for response in clientbound_packets {
+            self.write_packet_parts_now(response.packet_id, &response.payload)
+                .await;
+        }
+        if has_clientbound_packets {
+            let _ = self.network_writer.flush().await;
+        }
+        if cancelled {
+            return Ok(None);
+        }
+
+        let packet = RawPacket {
+            id: packet_id,
+            payload,
+        };
+        let decode_version = if translated {
+            CURRENT_MC_VERSION
+        } else {
+            self.version.load()
+        };
+        match state {
+            ConnectionState::HandShake => self.handle_handshake_packet(server, &packet).await,
+            ConnectionState::Status => {
+                self.handle_status_packet(server, &packet, decode_version)
+                    .await
             }
-            ConnectionState::Config => self.handle_config_packet(server, packet).await,
+            ConnectionState::Login | ConnectionState::Transfer => {
+                self.handle_login_packet(server, &packet, decode_version)
+                    .await
+            }
+            ConnectionState::Config => {
+                self.handle_config_packet(server, &packet, decode_version)
+                    .await
+            }
             ConnectionState::Play => Ok(None),
+        }
+    }
+
+    fn read_handshake_version(&self, packet: &RawPacket) {
+        let mut payload = &packet.payload[..];
+        let Ok(protocol_version) = payload.get_var_int() else {
+            return;
+        };
+        if let Ok(protocol_version) = u32::try_from(protocol_version.0) {
+            self.version
+                .store(JavaMinecraftVersion::from_protocol(protocol_version));
         }
     }
 
@@ -288,10 +412,10 @@ impl PendingConnection {
         &mut self,
         server: &Arc<Server>,
         packet: &RawPacket,
+        version: JavaMinecraftVersion,
     ) -> Result<Option<PacketHandlerResult>, ReadingError> {
         debug!("Handling status group");
         let mut payload = &packet.payload[..];
-        let version = self.version.load();
 
         match packet.id {
             id if id == pumpkin_protocol::java::server::status::SStatusRequest::to_id(version) => {
@@ -321,10 +445,10 @@ impl PendingConnection {
         &mut self,
         server: &Arc<Server>,
         packet: &RawPacket,
+        version: JavaMinecraftVersion,
     ) -> Result<Option<PacketHandlerResult>, ReadingError> {
         debug!("Handling login group");
         let mut payload = &packet.payload[..];
-        let version = self.version.load();
 
         match packet.id {
             id if id == pumpkin_protocol::java::server::login::SLoginStart::to_id(version) => {
@@ -391,10 +515,10 @@ impl PendingConnection {
         &mut self,
         server: &Arc<Server>,
         packet: &RawPacket,
+        version: JavaMinecraftVersion,
     ) -> Result<Option<PacketHandlerResult>, ReadingError> {
         debug!("Handling config group");
         let mut payload = &packet.payload[..];
-        let version = self.version.load();
 
         match packet.id {
             id if id == SClientInformationConfig::to_id(version) => {

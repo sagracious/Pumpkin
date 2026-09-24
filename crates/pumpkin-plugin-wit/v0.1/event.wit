@@ -379,6 +379,35 @@ interface event {
         cancelled: bool
     }
 
+    enum packet-direction {
+        clientbound,
+        serverbound,
+    }
+
+    record packet-translation-output {
+        packet-id: s32,
+        raw-payload: list<u8>
+    }
+
+    /// Raw Java packet choke-point used by protocol translators across all connection states.
+    record protocol-packet-event-data {
+        /// Stable for the lifetime of the socket, including before a Player exists.
+        connection-id: u64,
+        player: option<player>,
+        direction: packet-direction,
+        packet-id: s32,
+        raw-payload: list<u8>,
+        /// Negotiated protocol version; -1 for non-Java clients.
+        protocol-version: s32,
+        /// Handshake 0, status 1, login 2, transfer 3, config 4, play 5.
+        connection-state: u8,
+        /// True when the packet body and ID now use Pumpkin native layout.
+        translated: bool,
+        /// Ordered packets to send to the client after this packet (extras or replies).
+        clientbound-packets: list<packet-translation-output>,
+        cancelled: bool
+    }
+
     record player-interact-entity-event-data {
         player: player,
         entity-id: s32,
@@ -1934,6 +1963,7 @@ interface event {
         server-tick-end-event,
         packet-received-event,
         packet-sent-event,
+        protocol-packet-event,
         chunk-load-event,
         chunk-save-event,
         chunk-send-event,
@@ -2210,6 +2240,7 @@ interface event {
         server-tick-end-event(server-tick-end-event-data),
         packet-received-event(packet-received-event-data),
         packet-sent-event(packet-sent-event-data),
+        protocol-packet-event(protocol-packet-event-data),
         chunk-load-event(chunk-load-event-data),
         chunk-save-event(chunk-save-event-data),
         chunk-send-event(chunk-send-event-data),
