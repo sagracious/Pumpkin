@@ -759,9 +759,7 @@ impl DeathProtectionImpl {
 
     pub fn read_data(data: &NbtTag) -> Option<Self> {
         let compound = data.extract_compound()?;
-        let effects = compound
-            .get_list("death_effects")
-            .map_or(&[][..], |list| list.as_slice());
+        let effects = compound.get_list("death_effects").unwrap_or(&[]);
         if effects.len() > 256 {
             return None;
         }

@@ -1,0 +1,64 @@
+name: Verify PJM item component compatibility
+
+on:
+  push:
+    branches:
+      - feat/pjm-directional-consume-effect
+    paths:
+      - "crates/pumpkin-data/src/data_component_impl/combat.rs"
+      - "crates/pumpkin-data/src/data_component_impl/food.rs"
+      - "crates/pumpkin-protocol/src/codec/data_component.rs"
+      - "crates/pumpkin/src/entity/living.rs"
+      - "tools/pumpkin-codegen/src/item.rs"
+      - ".github/workflows/verify-pjm-item-components.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pjm-item-components-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-Dwarnings"
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@1.98.0
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+          shared-key: pjm-item-components
+
+      - name: Format changed sources
+        run: >-
+          rustfmt --edition 2024 --check
+          crates/pumpkin-data/src/data_component_impl/combat.rs
+          crates/pumpkin-data/src/data_component_impl/food.rs
+          crates/pumpkin-protocol/src/codec/data_component.rs
+          crates/pumpkin/src/entity/living.rs
+          tools/pumpkin-codegen/src/item.rs
+
+      - name: Test affected packages
+        run: >-
+          cargo test --locked
+          -p pumpkin-data
+          -p pumpkin-protocol
+          -p pumpkin-codegen
+
+      - name: Lint affected packages
+        run: >-
+          cargo clippy --locked --all-targets --all-features
+          -p pumpkin-data
+          -p pumpkin-protocol
+          -p pumpkin-codegen
