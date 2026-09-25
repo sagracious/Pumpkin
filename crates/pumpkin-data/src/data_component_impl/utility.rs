@@ -5,6 +5,7 @@ use crc_fast::Digest;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_nbt::tag::NbtTag;
 use std::borrow::Cow;
+use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum IntProvider {
@@ -315,15 +316,106 @@ impl DataComponentImpl for MapIdImpl {
     default_impl!(MapId);
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct MapDecorationsImpl;
+#[derive(Clone, Debug, PartialEq)]
+pub struct MapDecorationsImpl {
+    pub decorations: NbtCompound,
+}
+
 impl MapDecorationsImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        data.extract_compound().map(|decorations| Self {
+            decorations: decorations.clone(),
+        })
     }
 }
+
 impl DataComponentImpl for MapDecorationsImpl {
+    fn write_data(&self) -> NbtTag {
+        NbtTag::Compound(self.decorations.clone())
+    }
+
+    fn get_hash(&self) -> i32 {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        hash_nbt_compound(&self.decorations, &mut hasher);
+        hasher.finish() as i32
+    }
+
     default_impl!(MapDecorations);
+}
+
+fn hash_nbt_compound<H: Hasher>(compound: &NbtCompound, hasher: &mut H) {
+    let mut entries: Vec<_> = compound.child_tags.iter().collect();
+    entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
+    entries.len().hash(hasher);
+    for (name, value) in entries {
+        name.hash(hasher);
+        hash_nbt_tag(value, hasher);
+    }
+}
+
+fn hash_nbt_tag<H: Hasher>(tag: &NbtTag, hasher: &mut H) {
+    tag.get_type_id().hash(hasher);
+    match tag {
+        NbtTag::End => {}
+        NbtTag::Byte(value) => value.hash(hasher),
+        NbtTag::Short(value) => value.hash(hasher),
+        NbtTag::Int(value) => value.hash(hasher),
+        NbtTag::Long(value) => value.hash(hasher),
+        NbtTag::Float(value) => value.to_bits().hash(hasher),
+        NbtTag::Double(value) => value.to_bits().hash(hasher),
+        NbtTag::ByteArray(values) => values.hash(hasher),
+        NbtTag::String(value) => value.hash(hasher),
+        NbtTag::List(values) => {
+            values.len().hash(hasher);
+            for value in values {
+                hash_nbt_tag(value, hasher);
+            }
+        }
+        NbtTag::Compound(value) => hash_nbt_compound(value, hasher),
+        NbtTag::IntArray(values) => values.hash(hasher),
+        NbtTag::LongArray(values) => values.hash(hasher),
+    }
+}
+
+#[cfg(test)]
+mod map_decorations_tests {
+    use super::MapDecorationsImpl;
+    use crate::data_component_impl::DataComponentImpl;
+    use pumpkin_nbt::{compound::NbtCompound, tag::NbtTag};
+
+    fn decorations(reverse: bool) -> NbtCompound {
+        let mut entry = NbtCompound::new();
+        entry.put_string("type", "abandoned_camp".to_owned());
+        entry.put_int("x", 12);
+        let mut result = NbtCompound::new();
+        if reverse {
+            result.put("camp", NbtTag::Compound(entry.clone()));
+            result.put_int("map", 4);
+        } else {
+            result.put_int("map", 4);
+            result.put("camp", NbtTag::Compound(entry));
+        }
+        result
+    }
+
+    #[test]
+    fn map_decorations_are_retained_as_nbt() {
+        let input = NbtTag::Compound(decorations(false));
+        let component = MapDecorationsImpl::read_data(&input).expect("compound value");
+        assert_eq!(component.write_data(), input);
+        assert!(MapDecorationsImpl::read_data(&NbtTag::Int(1)).is_none());
+    }
+
+    #[test]
+    fn map_decoration_hash_is_independent_of_compound_entry_order() {
+        let left = MapDecorationsImpl {
+            decorations: decorations(false),
+        };
+        let right = MapDecorationsImpl {
+            decorations: decorations(true),
+        };
+        assert_eq!(left.get_hash(), right.get_hash());
+    }
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]

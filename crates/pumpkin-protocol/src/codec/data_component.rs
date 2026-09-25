@@ -2217,12 +2217,57 @@ impl DataComponentCodec<Self> for DyeImpl {
 }
 
 impl DataComponentCodec<Self> for MapDecorationsImpl {
-    fn serialize(&self, _seq: &mut impl NetworkWriteExt) -> Result<(), WritingError> {
-        Ok(())
+    fn serialize(&self, seq: &mut impl NetworkWriteExt) -> Result<(), WritingError> {
+        let mut bytes = Vec::new();
+        NbtTag::Compound(self.decorations.clone())
+            .serialize(&mut NbtWriteHelperJava::new(&mut bytes))
+            .map_err(|error| WritingError::Message(error.to_string()))?;
+        seq.write_slice(&bytes)
     }
 
-    fn deserialize(_seq: &mut impl NetworkReadExt) -> Result<Self, ReadingError> {
-        Ok(Self)
+    fn deserialize(seq: &mut impl NetworkReadExt) -> Result<Self, ReadingError> {
+        let decorations = seq
+            .get_compound_nbt_with_version(&JavaMinecraftVersion::V_26_3)?
+            .unwrap_or_else(pumpkin_nbt::compound::NbtCompound::new);
+        Ok(Self { decorations })
+    }
+}
+
+#[cfg(test)]
+mod map_decorations_tests {
+    use super::MapDecorationsImpl;
+    use pumpkin_data::data_component_impl::{DataComponentCodec, DataComponentImpl};
+    use pumpkin_nbt::{compound::NbtCompound, tag::NbtTag};
+
+    #[test]
+    fn map_decorations_component_preserves_all_nbt_entries_on_the_wire() {
+        let mut decoration = NbtCompound::new();
+        decoration.put_string("type", "abandoned_camp".to_string());
+        decoration.put_int("x", -24);
+        decoration.put_int("z", 31);
+        decoration.put_float("rotation", 1.5);
+
+        let mut decorations = NbtCompound::new();
+        decorations.put("camp", NbtTag::Compound(decoration));
+        let value = MapDecorationsImpl { decorations };
+
+        let mut encoded = Vec::new();
+        value.serialize(&mut encoded).unwrap();
+        let mut remaining = encoded.as_slice();
+        let decoded = MapDecorationsImpl::deserialize(&mut remaining).unwrap();
+
+        assert!(remaining.is_empty());
+        assert_eq!(decoded, value);
+        let NbtTag::Compound(decoded_data) = decoded.write_data() else {
+            panic!("map decorations must be represented as a compound");
+        };
+        let NbtTag::Compound(camp) = decoded_data.get("camp").unwrap() else {
+            panic!("decoration entry must remain a compound");
+        };
+        assert_eq!(camp.get_string("type").as_deref(), Some("abandoned_camp"));
+        assert_eq!(camp.get_int("x"), Some(-24));
+        assert_eq!(camp.get_int("z"), Some(31));
+        assert_eq!(camp.get_float("rotation"), Some(1.5));
     }
 }
 
