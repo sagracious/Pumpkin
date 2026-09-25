@@ -31,13 +31,16 @@ impl JavaClient {
 
         match result {
             TeleportResult::Success => {}
+            // Ignore stale or unsolicited confirms without clearing a pending
+            // teleport. Only a matching confirm may reset the pending position.
             TeleportResult::WrongId => {
-                self.try_kick(&TextComponent::text("Wrong teleport id"));
+                tracing::warn!(
+                    "Ignoring stale teleport confirm id {}",
+                    confirm_teleport.teleport_id.0
+                );
             }
             TeleportResult::NotTeleporting => {
-                self.try_kick(&TextComponent::text(
-                    "Send Teleport confirm, but we did not teleport",
-                ));
+                tracing::warn!("Ignoring unsolicited teleport confirm");
             }
         }
     }

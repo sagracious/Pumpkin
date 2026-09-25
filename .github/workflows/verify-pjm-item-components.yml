@@ -1,4 +1,4 @@
-name: Verify PJM item component compatibility
+name: Verify PJM item and lobby compatibility
 
 on:
   push:
@@ -8,7 +8,12 @@ on:
       - "crates/pumpkin-data/src/data_component_impl/combat.rs"
       - "crates/pumpkin-data/src/data_component_impl/food.rs"
       - "crates/pumpkin-protocol/src/codec/data_component.rs"
+      - "crates/pumpkin/src/entity/player.rs"
       - "crates/pumpkin/src/entity/living.rs"
+      - "crates/pumpkin/src/net/java/mod.rs"
+      - "crates/pumpkin/src/net/java/play/confirm_teleport.rs"
+      - "crates/pumpkin/src/server/connection_cache.rs"
+      - "crates/pumpkin/src/world/mod.rs"
       - "tools/pumpkin-codegen/src/item.rs"
       - ".github/workflows/verify-pjm-item-components.yml"
   workflow_dispatch:
@@ -46,7 +51,12 @@ jobs:
           crates/pumpkin-data/src/data_component_impl/combat.rs
           crates/pumpkin-data/src/data_component_impl/food.rs
           crates/pumpkin-protocol/src/codec/data_component.rs
+          crates/pumpkin/src/entity/player.rs
           crates/pumpkin/src/entity/living.rs
+          crates/pumpkin/src/net/java/mod.rs
+          crates/pumpkin/src/net/java/play/confirm_teleport.rs
+          crates/pumpkin/src/server/connection_cache.rs
+          crates/pumpkin/src/world/mod.rs
           tools/pumpkin-codegen/src/item.rs
 
       - name: Test affected packages
@@ -55,3 +65,4 @@ jobs:
           -p pumpkin-data
           -p pumpkin-protocol
           -p pumpkin-codegen
+          -p pumpkin

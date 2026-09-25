@@ -202,12 +202,10 @@ impl CachedStatus {
         };
 
         StatusResponse {
+            // Advertise the actual protocol version so status sniffers resolve
+            // this backend as its current version rather than the range minimum.
             version: Some(Version {
-                name: if LOWEST_SUPPORTED_MC_VERSION == CURRENT_MC_VERSION {
-                    CURRENT_MC_VERSION.to_string()
-                } else {
-                    format!("{LOWEST_SUPPORTED_MC_VERSION}-{CURRENT_MC_VERSION}")
-                },
+                name: CURRENT_MC_VERSION.to_string(),
                 protocol: CURRENT_MC_VERSION.protocol_version() as u32,
             }),
             players: Some(Players {

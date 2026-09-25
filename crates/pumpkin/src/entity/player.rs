@@ -1843,6 +1843,8 @@ impl Player {
             "minecraft:the_end" => 2,
             _ => 0,
         };
+        // DIAGNOSTIC: tag every remaining default-spawn emit.
+        tracing::warn!("spawnpos-emit: set-respawn-point");
         self.client.try_enqueue_packet_editioned(
             &CPlayerSpawnPosition::new(
                 final_block_pos,
@@ -3829,6 +3831,8 @@ impl Player {
 
     pub fn set_compass_target(&self, pos: pumpkin_util::math::position::BlockPos) {
         use pumpkin_protocol::java::client::play::CPlayerSpawnPosition;
+        // DIAGNOSTIC: tag every remaining default-spawn emit.
+        tracing::warn!("spawnpos-emit: compass-target");
         self.compass_target.store(Some(pos));
         self.try_send_client_packet(&CPlayerSpawnPosition::new(pos, 0.0, 0.0, String::new()));
     }
