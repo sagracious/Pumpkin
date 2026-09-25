@@ -924,7 +924,11 @@ impl JavaClient {
         // site. Never merge.
         if std::any::type_name::<P>().contains("PlayerSpawnPosition") {
             let bt = std::backtrace::Backtrace::capture();
-            let short: String = format!("{bt}").lines().take(18).collect::<Vec<_>>().join("\n");
+            let short: String = format!("{bt}")
+                .lines()
+                .take(18)
+                .collect::<Vec<_>>()
+                .join("\n");
             tracing::warn!("spawnpos-emit: encoder-choke\n{short}");
         }
         pumpkin_protocol::java::packet_encoder::serialize_packet(packet, &version)
