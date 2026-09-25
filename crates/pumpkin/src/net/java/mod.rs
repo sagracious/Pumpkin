@@ -78,6 +78,13 @@ use crate::plugin::api::events::world::chunk_send::ChunkSend;
 use crate::plugin::player::player_custom_payload::PlayerCustomPayloadEvent;
 use crate::{error::PumpkinError, server::Server};
 
+const MAX_TRANSLATED_FOLLOW_UP_PACKETS: usize = 64;
+
+pub(crate) struct ProtocolPacketEventOutput {
+    pub clientbound_packets: Vec<PacketTranslationOutput>,
+    pub serverbound_packets: Vec<PacketTranslationOutput>,
+}
+
 pub struct JavaClient {
     pub id: u64,
     pub version: AtomicCell<JavaMinecraftVersion>,
@@ -238,9 +245,12 @@ pub(crate) fn apply_protocol_packet_event(
     payload: &mut Bytes,
     translated: &mut bool,
     cancelled: &mut bool,
-) -> Vec<PacketTranslationOutput> {
+) -> ProtocolPacketEventOutput {
     if !server.plugin_manager.has_handlers::<ProtocolPacketEvent>() {
-        return Vec::new();
+        return ProtocolPacketEventOutput {
+            clientbound_packets: Vec::new(),
+            serverbound_packets: Vec::new(),
+        };
     }
 
     let mut event = ProtocolPacketEvent::new(
@@ -257,7 +267,10 @@ pub(crate) fn apply_protocol_packet_event(
     *payload = event.payload;
     *translated = event.translated;
     *cancelled = event.cancelled;
-    event.clientbound_packets
+    ProtocolPacketEventOutput {
+        clientbound_packets: event.clientbound_packets,
+        serverbound_packets: event.serverbound_packets,
+    }
 }
 
 fn encode_protocol_packet(packet_id: i32, payload: &[u8]) -> Option<Bytes> {
@@ -280,8 +293,6 @@ async fn apply_packet_sent_events(
     server: &Arc<Server>,
     close_token: &CancellationToken,
 ) -> Vec<OutgoingPacket> {
-    const MAX_TRANSLATED_FOLLOW_UP_PACKETS: usize = 64;
-
     let player = player_store.load_full();
     let player = player.as_ref().clone();
     let mut translated_packets = Vec::with_capacity(packets.len());
@@ -320,7 +331,7 @@ async fn apply_packet_sent_events(
                 ClientPlatform::Bedrock(_) => None,
             })
             .unwrap_or(state);
-        let clientbound_packets = apply_protocol_packet_event(
+        let event_output = apply_protocol_packet_event(
             server,
             connection_id,
             player.clone(),
@@ -332,6 +343,45 @@ async fn apply_packet_sent_events(
             &mut native_layout,
             &mut cancelled,
         );
+        let clientbound_packets = event_output.clientbound_packets;
+        let serverbound_packets = event_output.serverbound_packets;
+        let follow_up_bytes = serverbound_packets
+            .iter()
+            .fold(0usize, |total, packet| total.saturating_add(packet.payload.len()));
+        let java_client = player.as_ref().and_then(|player| match player.client.as_ref() {
+            ClientPlatform::Java(client) => Some((player, client)),
+            ClientPlatform::Bedrock(_) => None,
+        });
+        if (!serverbound_packets.is_empty() && !native_layout)
+            || serverbound_packets.len() > MAX_TRANSLATED_FOLLOW_UP_PACKETS
+            || follow_up_bytes > MAX_PENDING_BYTES
+            || serverbound_packets.iter().any(|packet| {
+                packet.packet_id < 0 || packet.payload.len() > MAX_PACKET_SIZE as usize
+            })
+            || (!serverbound_packets.is_empty() && java_client.is_none())
+        {
+            warn!("Invalid native serverbound follow-up output from clientbound packet event");
+            close_token.cancel();
+            decrement_pending_bytes(pending_bytes, original_len);
+            continue;
+        }
+        if let Some((player, client)) = java_client {
+            for follow_up in serverbound_packets {
+                let packet = RawPacket {
+                    id: follow_up.packet_id,
+                    payload: follow_up.payload,
+                };
+                if let Err(error) = client.handle_play_packet_inner(player, server, &packet, true) {
+                    warn!("Failed to dispatch native serverbound follow-up: {error}");
+                    client.close();
+                    break;
+                }
+            }
+        }
+        if close_token.is_cancelled() {
+            decrement_pending_bytes(pending_bytes, original_len);
+            continue;
+        }
         let mut follow_up = Vec::with_capacity(clientbound_packets.len());
         let mut invalid_output = clientbound_packets.len() > MAX_TRANSLATED_FOLLOW_UP_PACKETS;
         for follow_up_packet in clientbound_packets {
@@ -1134,37 +1184,86 @@ impl JavaClient {
         server: &Arc<Server>,
         packet: &RawPacket,
     ) -> Result<(), Box<dyn PumpkinError>> {
+        self.handle_play_packet_inner(player, server, packet, false)
+    }
+
+    fn handle_play_packet_inner(
+        &self,
+        player: &Arc<Player>,
+        server: &Arc<Server>,
+        packet: &RawPacket,
+        native_layout: bool,
+    ) -> Result<(), Box<dyn PumpkinError>> {
         let client_version = self.version.load();
+        let (packet_id, packet_payload, translated, cancelled, clientbound_packets, serverbound_packets) =
+            if native_layout {
+                (packet.id, packet.payload.clone(), true, false, Vec::new(), Vec::new())
+            } else {
+                let mut event = crate::plugin::server::packet::PacketReceivedEvent::new(
+                    player.clone(),
+                    packet.id,
+                    packet.payload.clone(),
+                );
+                server.plugin_manager.fire_blocking(server, &mut event);
+                if event.cancelled {
+                    return Ok(());
+                }
 
-        let mut event = crate::plugin::server::packet::PacketReceivedEvent::new(
-            player.clone(),
-            packet.id,
-            packet.payload.clone(),
-        );
-        server.plugin_manager.fire_blocking(server, &mut event);
-        if event.cancelled {
-            return Ok(());
-        }
+                let mut packet_id = event.packet_id;
+                let mut packet_payload = event.payload;
+                let mut translated = false;
+                let mut cancelled = false;
+                let event_output = apply_protocol_packet_event(
+                    server,
+                    self.id,
+                    Some(player.clone()),
+                    PacketDirection::Serverbound,
+                    client_version,
+                    self.connection_state.load(),
+                    &mut packet_id,
+                    &mut packet_payload,
+                    &mut translated,
+                    &mut cancelled,
+                );
+                (
+                    packet_id,
+                    packet_payload,
+                    translated,
+                    cancelled,
+                    event_output.clientbound_packets,
+                    event_output.serverbound_packets,
+                )
+            };
 
-        let mut packet_id = event.packet_id;
-        let mut packet_payload = event.payload;
-        let mut translated = false;
-        let mut cancelled = false;
-        let replies = apply_protocol_packet_event(
-            server,
-            self.id,
-            Some(player.clone()),
-            PacketDirection::Serverbound,
-            client_version,
-            self.connection_state.load(),
-            &mut packet_id,
-            &mut packet_payload,
-            &mut translated,
-            &mut cancelled,
-        );
-        for reply in replies {
+        for reply in clientbound_packets {
             self.try_enqueue_translated_packet(reply.packet_id, &reply.payload);
         }
+
+        let follow_up_bytes = serverbound_packets
+            .iter()
+            .fold(0usize, |total, packet| total.saturating_add(packet.payload.len()));
+        if (!serverbound_packets.is_empty() && !translated)
+            || serverbound_packets.len() > MAX_TRANSLATED_FOLLOW_UP_PACKETS
+            || follow_up_bytes > MAX_PENDING_BYTES
+            || serverbound_packets.iter().any(|packet| {
+                packet.packet_id < 0 || packet.payload.len() > MAX_PACKET_SIZE as usize
+            })
+        {
+            warn!("Invalid native serverbound protocol follow-up output; closing connection");
+            self.close();
+            return Ok(());
+        }
+        for follow_up in serverbound_packets {
+            let packet = RawPacket {
+                id: follow_up.packet_id,
+                payload: follow_up.payload,
+            };
+            // Follow-ups already use Pumpkin's native 26.3 packet layout. Run
+            // them through the same play dispatcher without firing client
+            // packet hooks or translating them a second time.
+            self.handle_play_packet_inner(player, server, &packet, true)?;
+        }
+
         if cancelled {
             return Ok(());
         }
@@ -1645,7 +1744,7 @@ impl JavaClient {
                 self.handle_configuration_acknowledged(player);
             }
             _ => {
-                warn!("Failed to handle player packet id {}", event.packet_id);
+                warn!("Failed to handle player packet id {packet_id}");
             }
         }
         Ok(())

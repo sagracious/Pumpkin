@@ -162,6 +162,14 @@ impl ToFromWasmEvent for ProtocolPacketEvent {
                     raw_payload: packet.payload.to_vec(),
                 })
                 .collect(),
+            serverbound_packets: self
+                .serverbound_packets
+                .iter()
+                .map(|packet| WitPacketTranslationOutput {
+                    packet_id: packet.packet_id,
+                    raw_payload: packet.payload.to_vec(),
+                })
+                .collect(),
             cancelled: self.cancelled,
         })
     }
@@ -175,6 +183,14 @@ impl ToFromWasmEvent for ProtocolPacketEvent {
             self.translated = data.translated;
             self.clientbound_packets = data
                 .clientbound_packets
+                .into_iter()
+                .map(|packet| PacketTranslationOutput {
+                    packet_id: packet.packet_id,
+                    payload: packet.raw_payload.into(),
+                })
+                .collect();
+            self.serverbound_packets = data
+                .serverbound_packets
                 .into_iter()
                 .map(|packet| PacketTranslationOutput {
                     packet_id: packet.packet_id,
@@ -432,6 +448,20 @@ mod tests {
                     packet_id: 9,
                     raw_payload: vec![5],
                 }],
+                serverbound_packets: vec![
+                    WitPacketTranslationOutput {
+                        packet_id: 10,
+                        raw_payload: vec![6],
+                    },
+                    WitPacketTranslationOutput {
+                        packet_id: 11,
+                        raw_payload: vec![7],
+                    },
+                    WitPacketTranslationOutput {
+                        packet_id: 12,
+                        raw_payload: vec![8],
+                    },
+                ],
                 cancelled: false,
             }),
             &mut state,
@@ -444,6 +474,13 @@ mod tests {
         assert_eq!(event.clientbound_packets.len(), 1);
         assert_eq!(event.clientbound_packets[0].packet_id, 9);
         assert_eq!(event.clientbound_packets[0].payload.as_ref(), &[5]);
+        assert_eq!(event.serverbound_packets.len(), 3);
+        assert_eq!(event.serverbound_packets[0].packet_id, 10);
+        assert_eq!(event.serverbound_packets[0].payload.as_ref(), &[6]);
+        assert_eq!(event.serverbound_packets[1].packet_id, 11);
+        assert_eq!(event.serverbound_packets[1].payload.as_ref(), &[7]);
+        assert_eq!(event.serverbound_packets[2].packet_id, 12);
+        assert_eq!(event.serverbound_packets[2].payload.as_ref(), &[8]);
     }
 
     #[test]

@@ -317,26 +317,39 @@ impl DataComponentImpl for MapIdImpl {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct MapDecorationsImpl {
-    pub decorations: NbtCompound,
+pub enum MapDecorationsImpl {
+    Empty,
+    Values(NbtCompound),
 }
 
 impl MapDecorationsImpl {
+    pub const EMPTY: Self = Self::Empty;
+
     pub fn read_data(data: &NbtTag) -> Option<Self> {
-        data.extract_compound().map(|decorations| Self {
-            decorations: decorations.clone(),
+        data.extract_compound().map(|decorations| {
+            if decorations.is_empty() {
+                Self::Empty
+            } else {
+                Self::Values(decorations.clone())
+            }
         })
     }
 }
 
 impl DataComponentImpl for MapDecorationsImpl {
     fn write_data(&self) -> NbtTag {
-        NbtTag::Compound(self.decorations.clone())
+        match self {
+            Self::Empty => NbtTag::Compound(NbtCompound::new()),
+            Self::Values(decorations) => NbtTag::Compound(decorations.clone()),
+        }
     }
 
     fn get_hash(&self) -> i32 {
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        hash_nbt_compound(&self.decorations, &mut hasher);
+        match self {
+            Self::Empty => hash_nbt_compound(&NbtCompound::new(), &mut hasher),
+            Self::Values(decorations) => hash_nbt_compound(decorations, &mut hasher),
+        }
         hasher.finish() as i32
     }
 
@@ -403,17 +416,14 @@ mod map_decorations_tests {
         let input = NbtTag::Compound(decorations(false));
         let component = MapDecorationsImpl::read_data(&input).expect("compound value");
         assert_eq!(component.write_data(), input);
+        assert_eq!(MapDecorationsImpl::EMPTY.write_data(), NbtTag::Compound(NbtCompound::new()));
         assert!(MapDecorationsImpl::read_data(&NbtTag::Int(1)).is_none());
     }
 
     #[test]
     fn map_decoration_hash_is_independent_of_compound_entry_order() {
-        let left = MapDecorationsImpl {
-            decorations: decorations(false),
-        };
-        let right = MapDecorationsImpl {
-            decorations: decorations(true),
-        };
+        let left = MapDecorationsImpl::Values(decorations(false));
+        let right = MapDecorationsImpl::Values(decorations(true));
         assert_eq!(left.get_hash(), right.get_hash());
     }
 }

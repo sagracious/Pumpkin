@@ -10,6 +10,9 @@ impl PendingConnection {
         debug!("Handling plugin");
         let proxy_config = &server.advanced_config.networking.proxy;
         if proxy_config.vine.enabled {
+            if self.vine_message_id.take() != Some(plugin_response.message_id.0) {
+                return None;
+            }
             let expected_challenge = self.vine_challenge.take();
             match vine::receive_vine_plugin_response(
                 self.address.port(),
@@ -28,6 +31,9 @@ impl PendingConnection {
                 }
             }
         } else if proxy_config.velocity.enabled {
+            if self.velocity_message_id.take() != Some(plugin_response.message_id.0) {
+                return None;
+            }
             match velocity::receive_velocity_plugin_response(
                 self.address.port(),
                 &proxy_config.velocity,

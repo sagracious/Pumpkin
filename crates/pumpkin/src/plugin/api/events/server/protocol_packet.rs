@@ -29,7 +29,10 @@ pub struct ProtocolPacketEvent {
     pub protocol_version: i32,
     pub connection_state: u8,
     pub translated: bool,
+    /// Ordered packets to write to the client, including replies to serverbound input.
     pub clientbound_packets: Vec<PacketTranslationOutput>,
+    /// Native serverbound packets for Pumpkin to process before the original.
+    pub serverbound_packets: Vec<PacketTranslationOutput>,
 }
 
 impl ProtocolPacketEvent {
@@ -54,6 +57,7 @@ impl ProtocolPacketEvent {
             connection_state,
             translated: false,
             clientbound_packets: Vec::new(),
+            serverbound_packets: Vec::new(),
             cancelled: false,
         }
     }

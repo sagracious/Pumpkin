@@ -405,6 +405,8 @@ interface event {
         translated: bool,
         /// Ordered packets to send to the client after this packet (extras or replies).
         clientbound-packets: list<packet-translation-output>,
+        /// Ordered native packets for Pumpkin to process before the translated original.
+        serverbound-packets: list<packet-translation-output>,
         cancelled: bool
     }
 

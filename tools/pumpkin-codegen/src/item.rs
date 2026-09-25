@@ -885,7 +885,7 @@ impl ToTokens for ItemComponents {
             tokens.extend(quote! { (Lore, &LoreImpl { lines: Vec::new() }), });
         }
         if self.map_decorations.is_some() {
-            tokens.extend(quote! { (MapDecorations, &MapDecorationsImpl), });
+            tokens.extend(quote! { (MapDecorations, &MapDecorationsImpl::EMPTY), });
         }
         if let Some(charge) = self.minimum_attack_charge {
             let charge = float_literal(charge);

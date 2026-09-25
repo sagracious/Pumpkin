@@ -10,7 +10,7 @@ use pumpkin_config::networking::compression::CompressionInfo;
 use pumpkin_data::packet::CURRENT_MC_VERSION;
 use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_protocol::{
-    ClientPacket, ConnectionState, PacketDecodeError, RawPacket, ServerPacket,
+    ClientPacket, ConnectionState, MAX_PACKET_SIZE, PacketDecodeError, RawPacket, ServerPacket,
     java::{
         client::config::CConfigDisconnect,
         client::login::CLoginDisconnect,
@@ -39,14 +39,16 @@ use tracing::{debug, error, warn};
 use crate::{
     entity::player::ChatMode,
     net::{
-        EncryptionError, GameProfile, PacketHandlerResult, PacketRateLimiter, PlayerConfig,
+        EncryptionError, GameProfile, MAX_PENDING_BYTES, PacketHandlerResult, PacketRateLimiter, PlayerConfig,
         can_not_join,
     },
     server::Server,
 };
 
 use super::{JavaClient, apply_protocol_packet_event};
-use crate::plugin::api::events::server::protocol_packet::PacketDirection;
+use crate::plugin::api::events::server::protocol_packet::{
+    PacketDirection, PacketTranslationOutput,
+};
 
 const BRAND_CHANNEL_PREFIX: &str = "minecraft:brand";
 
@@ -75,6 +77,8 @@ pub struct PendingConnection {
     pub brand: Option<String>,
     pub packet_limiter: PacketRateLimiter,
     pub verify_token: Option<[u8; 4]>,
+    pub velocity_message_id: Option<i32>,
+    pub vine_message_id: Option<i32>,
     pub vine_challenge: Option<[u8; 16]>,
 }
 
@@ -102,6 +106,8 @@ impl PendingConnection {
             brand: None,
             packet_limiter,
             verify_token: None,
+            velocity_message_id: None,
+            vine_message_id: None,
             vine_challenge: None,
         }
     }
@@ -207,7 +213,7 @@ impl PendingConnection {
         let mut payload = Bytes::copy_from_slice(encoded);
         let mut translated = false;
         let mut cancelled = false;
-        let packets = apply_protocol_packet_event(
+        let event_output = apply_protocol_packet_event(
             &server,
             self.id,
             None,
@@ -220,10 +226,15 @@ impl PendingConnection {
             &mut cancelled,
         );
 
+        self.process_native_serverbound_packets(&server, event_output.serverbound_packets)
+            .await;
+        if self.close_token.is_cancelled() {
+            return;
+        }
         if !cancelled {
             self.write_packet_parts_now(packet_id, &payload).await;
         }
-        for packet in packets {
+        for packet in event_output.clientbound_packets {
             self.write_packet_parts_now(packet.packet_id, &packet.payload)
                 .await;
         }
@@ -241,6 +252,62 @@ impl PendingConnection {
         encoded.extend_from_slice(payload);
         if let Err(err) = self.network_writer.write_packet(Bytes::from(encoded)).await {
             warn!("Failed to send packet to client {}: {}", self.id, err);
+        }
+    }
+
+    /// Handles a serverbound login reply synthesized from a clientbound login
+    /// query. Play-state follow-ups are handled by `JavaClient`.
+    async fn process_native_serverbound_packets(
+        &mut self,
+        server: &Arc<Server>,
+        packets: Vec<PacketTranslationOutput>,
+    ) {
+        let total_bytes = packets
+            .iter()
+            .fold(0usize, |total, packet| total.saturating_add(packet.payload.len()));
+        if packets.len() > 64
+            || total_bytes > MAX_PENDING_BYTES
+            || packets.iter().any(|packet| {
+                packet.packet_id < 0 || packet.payload.len() > MAX_PACKET_SIZE as usize
+            })
+        {
+            warn!("Invalid native serverbound protocol follow-up output; closing pending connection");
+            self.close_token.cancel();
+            return;
+        }
+
+        for packet in packets {
+            if !matches!(
+                self.connection_state.load(),
+                ConnectionState::Login | ConnectionState::Transfer
+            ) || packet.packet_id
+                != pumpkin_protocol::java::server::login::SLoginPluginResponse::to_id(
+                    CURRENT_MC_VERSION,
+                )
+            {
+                warn!("Unsupported native serverbound follow-up before play; closing pending connection");
+                self.close_token.cancel();
+                return;
+            }
+
+            let mut payload = packet.payload.as_ref();
+            let Ok(response) =
+                pumpkin_protocol::java::server::login::SLoginPluginResponse::read(
+                    &mut payload,
+                    &CURRENT_MC_VERSION,
+                )
+            else {
+                self.close_token.cancel();
+                return;
+            };
+            if self.handle_plugin_response(server, response).await.is_some() {
+                // An outgoing event cannot surface a pending-to-player
+                // transition through its caller. Current Via login replies are
+                // negative and never finish login.
+                warn!("Native serverbound login follow-up attempted a state transition");
+                self.close_token.cancel();
+                return;
+            }
         }
     }
 
@@ -320,7 +387,7 @@ impl PendingConnection {
         let mut payload = packet.payload.clone();
         let mut translated = false;
         let mut cancelled = false;
-        let clientbound_packets = apply_protocol_packet_event(
+        let event_output = apply_protocol_packet_event(
             server,
             self.id,
             None,
@@ -332,13 +399,18 @@ impl PendingConnection {
             &mut translated,
             &mut cancelled,
         );
-        let has_clientbound_packets = !clientbound_packets.is_empty();
-        for response in clientbound_packets {
+        let has_clientbound_packets = !event_output.clientbound_packets.is_empty();
+        for response in event_output.clientbound_packets {
             self.write_packet_parts_now(response.packet_id, &response.payload)
                 .await;
         }
         if has_clientbound_packets {
             let _ = self.network_writer.flush().await;
+        }
+        self.process_native_serverbound_packets(server, event_output.serverbound_packets)
+            .await;
+        if self.close_token.is_cancelled() {
+            return Ok(None);
         }
         if cancelled {
             return Ok(None);

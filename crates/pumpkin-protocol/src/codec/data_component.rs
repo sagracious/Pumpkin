@@ -2219,7 +2219,7 @@ impl DataComponentCodec<Self> for DyeImpl {
 impl DataComponentCodec<Self> for MapDecorationsImpl {
     fn serialize(&self, seq: &mut impl NetworkWriteExt) -> Result<(), WritingError> {
         let mut bytes = Vec::new();
-        NbtTag::Compound(self.decorations.clone())
+        self.write_data()
             .serialize(&mut NbtWriteHelperJava::new(&mut bytes))
             .map_err(|error| WritingError::Message(error.to_string()))?;
         seq.write_slice(&bytes)
@@ -2229,7 +2229,9 @@ impl DataComponentCodec<Self> for MapDecorationsImpl {
         let decorations = seq
             .get_compound_nbt_with_version(&JavaMinecraftVersion::V_26_3)?
             .unwrap_or_else(pumpkin_nbt::compound::NbtCompound::new);
-        Ok(Self { decorations })
+        let data = NbtTag::Compound(decorations);
+        MapDecorationsImpl::read_data(&data)
+            .ok_or_else(|| ReadingError::Message("invalid map decorations component".into()))
     }
 }
 
@@ -2249,7 +2251,7 @@ mod map_decorations_tests {
 
         let mut decorations = NbtCompound::new();
         decorations.put("camp", NbtTag::Compound(decoration));
-        let value = MapDecorationsImpl { decorations };
+        let value = MapDecorationsImpl::Values(decorations);
 
         let mut encoded = Vec::new();
         value.serialize(&mut encoded).unwrap();

@@ -8,11 +8,17 @@ on:
       - "crates/pumpkin-data/src/data_component_impl/combat.rs"
       - "crates/pumpkin-data/src/data_component_impl/food.rs"
       - "crates/pumpkin-data/src/data_component_impl/utility.rs"
+      - "crates/pumpkin-data/src/generated/item.rs"
+      - "crates/pumpkin-plugin-api/src/events/packet.rs"
       - "crates/pumpkin-protocol/src/codec/data_component.rs"
       - "crates/pumpkin/src/entity/player.rs"
       - "crates/pumpkin/src/entity/living.rs"
       - "crates/pumpkin/src/net/java/mod.rs"
+      - "crates/pumpkin/src/net/java/pending.rs"
       - "crates/pumpkin/src/net/java/play/confirm_teleport.rs"
+      - "crates/pumpkin/src/plugin/api/events/server/protocol_packet.rs"
+      - "crates/pumpkin/src/plugin/loader/wasm/wasm_host/wit/v0_1/events/server.rs"
+      - "crates/pumpkin-plugin-wit/v0.1/event.wit"
       - "crates/pumpkin/src/server/connection_cache.rs"
       - "crates/pumpkin/src/world/mod.rs"
       - "tools/pumpkin-codegen/src/item.rs"
@@ -53,10 +59,14 @@ jobs:
           crates/pumpkin-data/src/data_component_impl/food.rs
           crates/pumpkin-data/src/data_component_impl/utility.rs
           crates/pumpkin-protocol/src/codec/data_component.rs
+          crates/pumpkin-plugin-api/src/events/packet.rs
           crates/pumpkin/src/entity/player.rs
           crates/pumpkin/src/entity/living.rs
           crates/pumpkin/src/net/java/mod.rs
+          crates/pumpkin/src/net/java/pending.rs
           crates/pumpkin/src/net/java/play/confirm_teleport.rs
+          crates/pumpkin/src/plugin/api/events/server/protocol_packet.rs
+          crates/pumpkin/src/plugin/loader/wasm/wasm_host/wit/v0_1/events/server.rs
           crates/pumpkin/src/server/connection_cache.rs
           crates/pumpkin/src/world/mod.rs
           tools/pumpkin-codegen/src/item.rs
@@ -66,5 +76,6 @@ jobs:
           cargo test --locked
           -p pumpkin-data
           -p pumpkin-protocol
+          -p pumpkin-plugin-api
           -p pumpkin-codegen
           -p pumpkin

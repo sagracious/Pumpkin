@@ -51,6 +51,7 @@ pub enum VelocityError {
 pub async fn velocity_login(connection: &mut PendingConnection) {
     // TODO: Validate the packet transaction id from the plugin response with this
     let velocity_message_id: i32 = rand::rng().random();
+    connection.velocity_message_id = Some(velocity_message_id);
 
     let mut buf = BytesMut::new();
     buf.put_u8(MAX_SUPPORTED_FORWARDING_VERSION);

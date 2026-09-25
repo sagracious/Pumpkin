@@ -66,6 +66,7 @@ pub async fn vine_login(connection: &mut PendingConnection) {
     buf.put_slice(&challenge);
 
     connection.vine_challenge = Some(challenge);
+    connection.vine_message_id = Some(message_id);
 
     connection
         .send_packet_now(&CLoginPluginRequest::new(

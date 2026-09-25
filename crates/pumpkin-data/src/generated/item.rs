@@ -118,7 +118,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (MapDecorations, &MapDecorationsImpl),
+            (MapDecorations, &MapDecorationsImpl::EMPTY),
             (
                 Rarity,
                 &RarityImpl {
@@ -11224,7 +11224,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (MapDecorations, &MapDecorationsImpl),
+            (MapDecorations, &MapDecorationsImpl::EMPTY),
             (
                 Rarity,
                 &RarityImpl {
@@ -11274,7 +11274,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (MapDecorations, &MapDecorationsImpl),
+            (MapDecorations, &MapDecorationsImpl::EMPTY),
             (
                 Rarity,
                 &RarityImpl {
@@ -11324,7 +11324,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (MapDecorations, &MapDecorationsImpl),
+            (MapDecorations, &MapDecorationsImpl::EMPTY),
             (
                 Rarity,
                 &RarityImpl {
@@ -11374,7 +11374,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (MapDecorations, &MapDecorationsImpl),
+            (MapDecorations, &MapDecorationsImpl::EMPTY),
             (
                 Rarity,
                 &RarityImpl {
@@ -25588,7 +25588,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (MapDecorations, &MapDecorationsImpl),
+            (MapDecorations, &MapDecorationsImpl::EMPTY),
             (
                 Rarity,
                 &RarityImpl {
@@ -25638,7 +25638,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (MapDecorations, &MapDecorationsImpl),
+            (MapDecorations, &MapDecorationsImpl::EMPTY),
             (
                 Rarity,
                 &RarityImpl {
@@ -30545,7 +30545,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (MapDecorations, &MapDecorationsImpl),
+            (MapDecorations, &MapDecorationsImpl::EMPTY),
             (
                 Rarity,
                 &RarityImpl {
@@ -40947,7 +40947,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (MapDecorations, &MapDecorationsImpl),
+            (MapDecorations, &MapDecorationsImpl::EMPTY),
             (
                 Rarity,
                 &RarityImpl {
@@ -55240,7 +55240,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (MapDecorations, &MapDecorationsImpl),
+            (MapDecorations, &MapDecorationsImpl::EMPTY),
             (
                 Rarity,
                 &RarityImpl {
@@ -61002,7 +61002,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (MapDecorations, &MapDecorationsImpl),
+            (MapDecorations, &MapDecorationsImpl::EMPTY),
             (
                 Rarity,
                 &RarityImpl {
@@ -71126,7 +71126,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (MapDecorations, &MapDecorationsImpl),
+            (MapDecorations, &MapDecorationsImpl::EMPTY),
             (
                 Rarity,
                 &RarityImpl {
@@ -74149,7 +74149,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (MapDecorations, &MapDecorationsImpl),
+            (MapDecorations, &MapDecorationsImpl::EMPTY),
             (
                 Rarity,
                 &RarityImpl {
@@ -79896,7 +79896,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (MapDecorations, &MapDecorationsImpl),
+            (MapDecorations, &MapDecorationsImpl::EMPTY),
             (
                 Rarity,
                 &RarityImpl {
@@ -80114,7 +80114,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (MapDecorations, &MapDecorationsImpl),
+            (MapDecorations, &MapDecorationsImpl::EMPTY),
             (
                 Rarity,
                 &RarityImpl {
@@ -82807,7 +82807,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (MapDecorations, &MapDecorationsImpl),
+            (MapDecorations, &MapDecorationsImpl::EMPTY),
             (
                 Rarity,
                 &RarityImpl {
@@ -90213,7 +90213,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (MapDecorations, &MapDecorationsImpl),
+            (MapDecorations, &MapDecorationsImpl::EMPTY),
             (
                 Rarity,
                 &RarityImpl {

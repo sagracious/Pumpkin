@@ -6,6 +6,7 @@ on:
       - fix/pjm-packet-sent
       - feat/pjm-event-context
       - feat/pjm-raw-packet-events
+      - feat/pjm-directional-consume-effect
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
