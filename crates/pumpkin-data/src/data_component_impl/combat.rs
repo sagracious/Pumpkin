@@ -3,6 +3,7 @@ use crate::Enchantment;
 use crate::attributes::Attributes;
 use crate::damage::DamageType;
 use crate::data_component_impl::basic::SoundEvent;
+use crate::data_component_impl::food::ConsumeEffect;
 use crate::data_component_impl::{
     DataComponentImpl, EquipmentSlot, IDSet, IdOr, get_f32_hash, get_i32_hash, get_idor,
     get_idor_hash, get_idset_hash, get_str_hash, put_idor,
@@ -747,15 +748,83 @@ impl DataComponentImpl for GliderImpl {
     default_impl!(Glider);
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct DeathProtectionImpl;
+#[derive(Clone, Debug, PartialEq)]
+pub struct DeathProtectionImpl {
+    pub effects: Cow<'static, [ConsumeEffect]>,
+}
 impl DeathProtectionImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+    pub const EMPTY: Self = Self {
+        effects: Cow::Borrowed(&[]),
+    };
+
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        let compound = data.extract_compound()?;
+        let effects = compound
+            .get_list("death_effects")
+            .map_or(&[][..], |list| list.as_slice());
+        if effects.len() > 256 {
+            return None;
+        }
+        Some(Self {
+            effects: Cow::Owned(
+                effects
+                    .iter()
+                    .filter_map(ConsumeEffect::read_data)
+                    .collect(),
+            ),
+        })
     }
 }
 impl DataComponentImpl for DeathProtectionImpl {
+    fn write_data(&self) -> NbtTag {
+        let mut compound = NbtCompound::new();
+        compound.put_list(
+            "death_effects",
+            self.effects.iter().map(ConsumeEffect::as_nbt).collect(),
+        );
+        NbtTag::Compound(compound)
+    }
+
+    fn get_hash(&self) -> i32 {
+        let mut digest = Digest::new(Crc32Iscsi);
+        for effect in self.effects.iter() {
+            digest.update(&effect.get_hash().to_le_bytes());
+        }
+        digest.finalize() as i32
+    }
+
     default_impl!(DeathProtection);
+}
+
+#[cfg(test)]
+mod death_protection_tests {
+    use super::{ConsumeEffect, DataComponentImpl, DeathProtectionImpl};
+    use crate::item::Item;
+    use std::borrow::Cow;
+
+    #[test]
+    fn death_protection_effects_round_trip_through_component_nbt() {
+        let expected = DeathProtectionImpl {
+            effects: Cow::Owned(vec![ConsumeEffect::TeleportRandomly(16.0, false)]),
+        };
+        let encoded = expected.write_data();
+        let decoded = DeathProtectionImpl::read_data(&encoded).unwrap();
+        assert_eq!(decoded, expected);
+    }
+
+    #[test]
+    fn the_generated_totem_keeps_its_death_protection_effects() {
+        let effects = Item::TOTEM_OF_UNDYING
+            .components
+            .iter()
+            .find_map(|(id, component)| {
+                (*id == crate::data_component::DataComponent::DeathProtection)
+                    .then(|| component.as_any().downcast_ref::<DeathProtectionImpl>())
+                    .flatten()
+            })
+            .expect("totem has a death-protection component");
+        assert_eq!(effects.effects.len(), 2);
+    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

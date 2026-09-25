@@ -176,7 +176,11 @@ fn deserialize_consume_effect(
         2 => Ok(ConsumeEffect::ClearAllEffects),
         3 => {
             let diameter = seq.get_f32()?;
-            Ok(ConsumeEffect::TeleportRandomly(diameter))
+            let directional_particles = seq.get_bool()?;
+            Ok(ConsumeEffect::TeleportRandomly(
+                diameter,
+                directional_particles,
+            ))
         }
         4 => {
             // Need to read IdOr<SoundEvent> manually. This depends on how it is serialized.
@@ -215,7 +219,10 @@ fn serialize_consume_effect(
         }
         ConsumeEffect::RemoveEffects(idset) => serialize_idset(idset, seq)?,
         ConsumeEffect::ClearAllEffects => (),
-        ConsumeEffect::TeleportRandomly(diameter) => seq.write_f32(*diameter)?,
+        ConsumeEffect::TeleportRandomly(diameter, directional_particles) => {
+            seq.write_f32(*diameter)?;
+            seq.write_bool(*directional_particles)?;
+        }
         ConsumeEffect::PlaySound(id_or) => {
             crate::IdOr::<crate::SoundEvent>::write(&data_to_proto_sound(id_or), seq, |w, e| {
                 w.write_string(&e.sound_name)?;
@@ -1913,15 +1920,34 @@ impl DataComponentCodec<Self> for TooltipStyleImpl {
 
 impl DataComponentCodec<Self> for DeathProtectionImpl {
     fn serialize(&self, seq: &mut impl NetworkWriteExt) -> Result<(), WritingError> {
-        seq.write_var_int(&VarInt(0))
+        if self.effects.len() > 256 {
+            return Err(WritingError::Message(
+                "too many death-protection effects".into(),
+            ));
+        }
+        let len = i32::try_from(self.effects.len())
+            .map_err(|_| WritingError::Message("death-protection effect list too long".into()))?;
+        seq.write_var_int(&VarInt(len))?;
+        for effect in self.effects.iter() {
+            serialize_consume_effect(effect, seq)?;
+        }
+        Ok(())
     }
 
     fn deserialize(seq: &mut impl NetworkReadExt) -> Result<Self, ReadingError> {
-        let len = seq.get_var_int()?.0 as usize;
-        for _ in 0..len {
-            let _ = deserialize_consume_effect(seq)?;
+        const MAX_DEATH_PROTECTION_EFFECTS: i32 = 256;
+        let len = seq.get_var_int()?.0;
+        if !(0..=MAX_DEATH_PROTECTION_EFFECTS).contains(&len) {
+            return Err(ReadingError::Message(
+                "invalid death-protection effect count".into(),
+            ));
         }
-        Ok(Self)
+        let effects = (0..len)
+            .map(|_| deserialize_consume_effect(seq))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Self {
+            effects: Cow::Owned(effects),
+        })
     }
 }
 
@@ -2793,6 +2819,43 @@ impl DataComponentCodec<Self> for ContainerLootImpl {
             loot_table: String::new(),
             seed: 0,
         })
+    }
+}
+
+#[cfg(test)]
+mod teleport_randomly_tests {
+    use super::*;
+
+    #[test]
+    fn directional_particle_flag_round_trips_on_the_26_3_wire() {
+        for directional_particles in [false, true] {
+            let expected = ConsumeEffect::TeleportRandomly(16.0, directional_particles);
+            let mut bytes = Vec::new();
+            serialize_consume_effect(&expected, &mut bytes).unwrap();
+            let mut input = bytes.as_slice();
+            let actual = deserialize_consume_effect(&mut input).unwrap();
+            assert_eq!(actual, expected);
+            assert!(input.is_empty());
+        }
+    }
+
+    #[test]
+    fn death_protection_keeps_directional_consume_effects() {
+        let expected = DeathProtectionImpl {
+            effects: Cow::Owned(vec![ConsumeEffect::TeleportRandomly(16.0, false)]),
+        };
+        let mut bytes = Vec::new();
+        <DeathProtectionImpl as DataComponentCodec<DeathProtectionImpl>>::serialize(
+            &expected, &mut bytes,
+        )
+        .unwrap();
+        let mut input = bytes.as_slice();
+        let actual = <DeathProtectionImpl as DataComponentCodec<DeathProtectionImpl>>::deserialize(
+            &mut input,
+        )
+        .unwrap();
+        assert_eq!(actual, expected);
+        assert!(input.is_empty());
     }
 }
 

@@ -175,7 +175,7 @@ pub enum ConsumeEffect {
     ApplyEffects((Cow<'static, [StatusEffectInstance]>, f32)),
     RemoveEffects(IDSet<StatusEffect>),
     ClearAllEffects,
-    TeleportRandomly(f32),
+    TeleportRandomly(f32, bool),
     PlaySound(IdOr<SoundEvent>),
 }
 impl Hash for ConsumeEffect {
@@ -190,9 +190,10 @@ impl Hash for ConsumeEffect {
                 status_effect_instances.hash(state)
             }
             ConsumeEffect::ClearAllEffects => (),
-            ConsumeEffect::TeleportRandomly(dst) => unsafe {
-                (*(&raw const dst).cast::<u32>()).hash(state)
-            },
+            ConsumeEffect::TeleportRandomly(dst, directional_particles) => {
+                unsafe { (*(&raw const dst).cast::<u32>()).hash(state) };
+                directional_particles.hash(state);
+            }
             ConsumeEffect::PlaySound(id_or) => id_or.hash(state),
         }
     }
@@ -203,7 +204,7 @@ impl ConsumeEffect {
             ConsumeEffect::ApplyEffects(_) => "apply_effects",
             ConsumeEffect::RemoveEffects(_) => "remove_effects",
             ConsumeEffect::ClearAllEffects => "clear_all_effects",
-            ConsumeEffect::TeleportRandomly(_) => "teleport_randomly",
+            ConsumeEffect::TeleportRandomly(..) => "teleport_randomly",
             ConsumeEffect::PlaySound(_) => "play_sound",
         }
     }
@@ -212,7 +213,7 @@ impl ConsumeEffect {
             ConsumeEffect::ApplyEffects(_) => 0,
             ConsumeEffect::RemoveEffects(_) => 1,
             ConsumeEffect::ClearAllEffects => 2,
-            ConsumeEffect::TeleportRandomly(_) => 3,
+            ConsumeEffect::TeleportRandomly(..) => 3,
             ConsumeEffect::PlaySound(_) => 4,
         }
     }
@@ -227,7 +228,9 @@ impl ConsumeEffect {
             "clear_all_effects" => Some(Self::ClearAllEffects),
             "teleport_randomly" => {
                 let dst = compound.get_float("diameter")?;
-                Some(Self::TeleportRandomly(dst))
+                let directional_particles =
+                    compound.get_bool("directional_particles").unwrap_or(true);
+                Some(Self::TeleportRandomly(dst, directional_particles))
             }
             "play_sound" => {
                 let sound = get_idor(compound, "sound", Sound::EntityGenericEat);
@@ -257,7 +260,10 @@ impl ConsumeEffect {
             }
             ConsumeEffect::RemoveEffects(idset) => idset.write(&mut compound, "effects"),
             ConsumeEffect::ClearAllEffects => (),
-            ConsumeEffect::TeleportRandomly(dst) => compound.put_float("diameter", *dst),
+            ConsumeEffect::TeleportRandomly(dst, directional_particles) => {
+                compound.put_float("diameter", *dst);
+                compound.put_bool("directional_particles", *directional_particles);
+            }
             ConsumeEffect::PlaySound(id_or) => {
                 put_idor(&mut compound, "sound", id_or);
             }
@@ -282,9 +288,10 @@ impl ConsumeEffect {
             ConsumeEffect::ClearAllEffects => {
                 digest.update(&[3u8]);
             }
-            ConsumeEffect::TeleportRandomly(dst) => {
+            ConsumeEffect::TeleportRandomly(dst, directional_particles) => {
                 digest.update(&[4u8]);
                 digest.update(&get_f32_hash(*dst).to_le_bytes());
+                digest.update(&[*directional_particles as u8]);
             }
             ConsumeEffect::PlaySound(id_or) => {
                 digest.update(&[5u8]);
@@ -593,8 +600,9 @@ impl Hash for PotionDurationScaleImpl {
 
 #[cfg(test)]
 mod tests {
-    use super::{DataComponentImpl, PotionDurationScaleImpl};
+    use super::{ConsumeEffect, DataComponentImpl, PotionDurationScaleImpl};
     use crate::item::Item;
+    use pumpkin_nbt::{compound::NbtCompound, tag::NbtTag};
 
     #[test]
     fn potion_duration_scale_round_trips_as_a_float() {
@@ -618,6 +626,34 @@ mod tests {
             .expect("tipped arrows should have a duration scale");
 
         assert_eq!(scale.scale, 0.125);
+    }
+
+    #[test]
+    fn teleport_randomly_defaults_directional_particles_to_true() {
+        let mut nbt = NbtCompound::new();
+        nbt.put_string("type", "teleport_randomly".to_owned());
+        nbt.put_float("diameter", 16.0);
+        let effect = ConsumeEffect::read_data(&NbtTag::Compound(nbt)).unwrap();
+        assert_eq!(effect, ConsumeEffect::TeleportRandomly(16.0, true));
+
+        let disabled = ConsumeEffect::TeleportRandomly(16.0, false);
+        assert_ne!(effect.get_hash(), disabled.get_hash());
+        let NbtTag::Compound(encoded) = disabled.as_nbt() else {
+            panic!("compound");
+        };
+        assert_eq!(encoded.get_bool("directional_particles"), Some(false));
+    }
+
+    #[test]
+    fn a_teleport_randomly_nbt_flag_changes_the_hash() {
+        let make = |directional_particles| {
+            let mut nbt = NbtCompound::new();
+            nbt.put_string("type", "teleport_randomly".to_owned());
+            nbt.put_float("diameter", 16.0);
+            nbt.put_bool("directional_particles", directional_particles);
+            ConsumeEffect::read_data(&NbtTag::Compound(nbt)).unwrap()
+        };
+        assert_ne!(make(true).get_hash(), make(false).get_hash());
     }
 }
 
