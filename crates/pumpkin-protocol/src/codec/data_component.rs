@@ -990,8 +990,9 @@ pub fn deserialize(
         DataComponent::BlocksAttacks => Ok(BlocksAttacksImpl::deserialize(seq)?.to_dyn()),
         DataComponent::PiercingWeapon => Ok(PiercingWeaponImpl::deserialize(seq)?.to_dyn()),
         DataComponent::KineticWeapon => Ok(KineticWeaponImpl::deserialize(seq)?.to_dyn()),
-        DataComponent::AttackAnimation => Ok(SwingAnimationImpl::deserialize(seq)?.to_dyn()),
-        DataComponent::InteractAnimation => Ok(SwingAnimationImpl::deserialize(seq)?.to_dyn()),
+        DataComponent::AttackAnimation | DataComponent::InteractAnimation => {
+            Ok(SwingAnimationImpl::deserialize(seq)?.to_dyn())
+        }
         DataComponent::AdditionalTradeCost => {
             Ok(AdditionalTradeCostImpl::deserialize(seq)?.to_dyn())
         }
@@ -1143,8 +1144,9 @@ pub fn serialize(
         DataComponent::BlocksAttacks => get::<BlocksAttacksImpl>(value).serialize(seq),
         DataComponent::PiercingWeapon => get::<PiercingWeaponImpl>(value).serialize(seq),
         DataComponent::KineticWeapon => get::<KineticWeaponImpl>(value).serialize(seq),
-        DataComponent::AttackAnimation => get::<SwingAnimationImpl>(value).serialize(seq),
-        DataComponent::InteractAnimation => get::<SwingAnimationImpl>(value).serialize(seq),
+        DataComponent::AttackAnimation | DataComponent::InteractAnimation => {
+            get::<SwingAnimationImpl>(value).serialize(seq)
+        }
         DataComponent::AdditionalTradeCost => get::<AdditionalTradeCostImpl>(value).serialize(seq),
         DataComponent::StoredEnchantments => get::<StoredEnchantmentsImpl>(value).serialize(seq),
         DataComponent::Dye => get::<DyeImpl>(value).serialize(seq),
@@ -2822,6 +2824,17 @@ impl DataComponentCodec<Self> for ContainerLootImpl {
     }
 }
 
+impl DataComponentCodec<Self> for BreakSoundImpl {
+    fn serialize(&self, seq: &mut impl NetworkWriteExt) -> Result<(), WritingError> {
+        seq.write_var_int(&VarInt(0))
+    }
+
+    fn deserialize(seq: &mut impl NetworkReadExt) -> Result<Self, ReadingError> {
+        let _ = seq.get_var_int()?;
+        Ok(Self)
+    }
+}
+
 #[cfg(test)]
 mod teleport_randomly_tests {
     use super::*;
@@ -2856,16 +2869,5 @@ mod teleport_randomly_tests {
         .unwrap();
         assert_eq!(actual, expected);
         assert!(input.is_empty());
-    }
-}
-
-impl DataComponentCodec<Self> for BreakSoundImpl {
-    fn serialize(&self, seq: &mut impl NetworkWriteExt) -> Result<(), WritingError> {
-        seq.write_var_int(&VarInt(0))
-    }
-
-    fn deserialize(seq: &mut impl NetworkReadExt) -> Result<Self, ReadingError> {
-        let _ = seq.get_var_int()?;
-        Ok(Self)
     }
 }
