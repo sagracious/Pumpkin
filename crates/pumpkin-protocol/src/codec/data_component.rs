@@ -2237,8 +2237,8 @@ impl DataComponentCodec<Self> for MapDecorationsImpl {
 
 #[cfg(test)]
 mod map_decorations_tests {
-    use super::MapDecorationsImpl;
-    use pumpkin_data::data_component_impl::{DataComponentCodec, DataComponentImpl};
+    use super::{DataComponentCodec, MapDecorationsImpl};
+    use pumpkin_data::data_component_impl::DataComponentImpl;
     use pumpkin_nbt::{compound::NbtCompound, tag::NbtTag};
 
     #[test]
