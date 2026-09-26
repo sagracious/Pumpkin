@@ -14,8 +14,11 @@ on:
       - "crates/pumpkin/src/entity/player.rs"
       - "crates/pumpkin/src/entity/living.rs"
       - "crates/pumpkin/src/net/java/mod.rs"
+      - "crates/pumpkin/src/net/java/login/plugin_response.rs"
       - "crates/pumpkin/src/net/java/pending.rs"
       - "crates/pumpkin/src/net/java/play/confirm_teleport.rs"
+      - "crates/pumpkin/src/net/proxy/velocity.rs"
+      - "crates/pumpkin/src/net/proxy/vine.rs"
       - "crates/pumpkin/src/plugin/api/events/server/protocol_packet.rs"
       - "crates/pumpkin/src/plugin/loader/wasm/wasm_host/wit/v0_1/events/server.rs"
       - "crates/pumpkin-plugin-wit/v0.1/event.wit"
@@ -63,8 +66,11 @@ jobs:
           crates/pumpkin/src/entity/player.rs
           crates/pumpkin/src/entity/living.rs
           crates/pumpkin/src/net/java/mod.rs
+          crates/pumpkin/src/net/java/login/plugin_response.rs
           crates/pumpkin/src/net/java/pending.rs
           crates/pumpkin/src/net/java/play/confirm_teleport.rs
+          crates/pumpkin/src/net/proxy/velocity.rs
+          crates/pumpkin/src/net/proxy/vine.rs
           crates/pumpkin/src/plugin/api/events/server/protocol_packet.rs
           crates/pumpkin/src/plugin/loader/wasm/wasm_host/wit/v0_1/events/server.rs
           crates/pumpkin/src/server/connection_cache.rs
