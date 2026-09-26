@@ -16,6 +16,31 @@ use pumpkin_util::version::JavaMinecraftVersion;
 
 const MAX_STATUS_EFFECTS: usize = 128;
 
+fn static_registry_id(registry_id: &str, key: &str) -> Option<i32> {
+    // Minecraft holder types encode registry index zero as VarInt(1); zero
+    // denotes an inline registry value.
+    let key = key.strip_prefix("minecraft:").unwrap_or(key);
+    let registry = pumpkin_data::registry::REGISTRY_V_26_3
+        .iter()
+        .find(|registry| registry.registry_id == registry_id)?;
+    i32::try_from(
+        registry
+            .entries
+            .iter()
+            .position(|entry| entry.name == key)?,
+    )
+    .ok()?
+    .checked_add(1)
+}
+
+fn static_registry_key(registry_id: &str, holder_id: i32) -> Option<String> {
+    let id = usize::try_from(holder_id.checked_sub(1)?).ok()?;
+    let registry = pumpkin_data::registry::REGISTRY_V_26_3
+        .iter()
+        .find(|registry| registry.registry_id == registry_id)?;
+    Some(format!("minecraft:{}", registry.entries.get(id)?.name))
+}
+
 #[must_use]
 pub fn data_to_proto_sound(id_or: &IdOr<SoundEvent>) -> crate::IdOr<crate::SoundEvent> {
     match id_or {
@@ -2394,16 +2419,36 @@ impl DataComponentCodec<Self> for WrittenBookContentImpl {
 
 impl DataComponentCodec<Self> for TrimImpl {
     fn serialize(&self, seq: &mut impl NetworkWriteExt) -> Result<(), WritingError> {
-        seq.write_var_int(&VarInt(0))?;
-        seq.write_var_int(&VarInt(0))
+        let material = self
+            .material
+            .extract_string()
+            .ok_or_else(|| WritingError::Message("trim material must be a registry key".into()))?;
+        let pattern = self
+            .pattern
+            .extract_string()
+            .ok_or_else(|| WritingError::Message("trim pattern must be a registry key".into()))?;
+        let material_id = static_registry_id("trim_material", material).ok_or_else(|| {
+            WritingError::Message(format!("unknown trim material registry key {material}"))
+        })?;
+        let pattern_id = static_registry_id("trim_pattern", pattern).ok_or_else(|| {
+            WritingError::Message(format!("unknown trim pattern registry key {pattern}"))
+        })?;
+        seq.write_var_int(&VarInt(material_id))?;
+        seq.write_var_int(&VarInt(pattern_id))
     }
 
     fn deserialize(seq: &mut impl NetworkReadExt) -> Result<Self, ReadingError> {
-        let _material = seq.get_var_int()?;
-        let _pattern = seq.get_var_int()?;
+        let material_holder = seq.get_var_int()?.0;
+        let pattern_holder = seq.get_var_int()?.0;
+        let material = static_registry_key("trim_material", material_holder).ok_or_else(|| {
+            ReadingError::Message(format!("unknown trim material holder id {material_holder}"))
+        })?;
+        let pattern = static_registry_key("trim_pattern", pattern_holder).ok_or_else(|| {
+            ReadingError::Message(format!("unknown trim pattern holder id {pattern_holder}"))
+        })?;
         Ok(Self {
-            material: NbtTag::String("minecraft:quartz".into()),
-            pattern: NbtTag::String("minecraft:coast".into()),
+            material: NbtTag::String(material.into()),
+            pattern: NbtTag::String(pattern.into()),
         })
     }
 }
@@ -2462,23 +2507,45 @@ impl DataComponentCodec<Self> for BlockEntityDataImpl {
 
 impl DataComponentCodec<Self> for InstrumentImpl {
     fn serialize(&self, seq: &mut impl NetworkWriteExt) -> Result<(), WritingError> {
-        seq.write_var_int(&VarInt(0))
+        let id = static_registry_id("instrument", self.instrument.as_ref()).ok_or_else(|| {
+            WritingError::Message(format!(
+                "unknown instrument registry key {}",
+                self.instrument
+            ))
+        })?;
+        seq.write_var_int(&VarInt(id))
     }
 
     fn deserialize(seq: &mut impl NetworkReadExt) -> Result<Self, ReadingError> {
-        let _ = seq.get_var_int()?;
-        Ok(Self)
+        let holder_id = seq.get_var_int()?.0;
+        let instrument = static_registry_key("instrument", holder_id).ok_or_else(|| {
+            ReadingError::Message(format!("unknown instrument holder id {holder_id}"))
+        })?;
+        Ok(Self {
+            instrument: Cow::Owned(instrument),
+        })
     }
 }
 
 impl DataComponentCodec<Self> for ProvidesTrimMaterialImpl {
     fn serialize(&self, seq: &mut impl NetworkWriteExt) -> Result<(), WritingError> {
-        seq.write_var_int(&VarInt(0))
+        let id = static_registry_id("trim_material", self.material.as_ref()).ok_or_else(|| {
+            WritingError::Message(format!(
+                "unknown trim material registry key {}",
+                self.material
+            ))
+        })?;
+        seq.write_var_int(&VarInt(id))
     }
 
     fn deserialize(seq: &mut impl NetworkReadExt) -> Result<Self, ReadingError> {
-        let _ = seq.get_var_int()?;
-        Ok(Self)
+        let holder_id = seq.get_var_int()?.0;
+        let material = static_registry_key("trim_material", holder_id).ok_or_else(|| {
+            ReadingError::Message(format!("unknown trim material holder id {holder_id}"))
+        })?;
+        Ok(Self {
+            material: Cow::Owned(material),
+        })
     }
 }
 
@@ -2916,5 +2983,82 @@ mod teleport_randomly_tests {
         .unwrap();
         assert_eq!(actual, expected);
         assert!(input.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod trim_instrument_registry_tests {
+    use super::{DataComponentCodec, TrimImpl};
+    use pumpkin_data::data_component_impl::{
+        DataComponentImpl, InstrumentImpl, ProvidesTrimMaterialImpl,
+    };
+    use pumpkin_nbt::{compound::NbtCompound, tag::NbtTag};
+    use std::borrow::Cow;
+
+    #[test]
+    fn trim_component_preserves_both_registry_values() {
+        let value = TrimImpl {
+            material: NbtTag::String("minecraft:iron".into()),
+            pattern: NbtTag::String("minecraft:coast".into()),
+        };
+        let mut trim = NbtCompound::new();
+        trim.put("material", NbtTag::String("minecraft:iron".into()));
+        trim.put("pattern", NbtTag::String("minecraft:coast".into()));
+        assert_eq!(value.write_data(), NbtTag::Compound(trim));
+        let mut bytes = Vec::new();
+        value.serialize(&mut bytes).unwrap();
+        assert_eq!(bytes, vec![6, 2]);
+
+        let mut remaining = bytes.as_slice();
+        let decoded = TrimImpl::deserialize(&mut remaining).unwrap();
+        assert!(remaining.is_empty());
+        assert_eq!(decoded, value);
+    }
+
+    #[test]
+    fn instrument_components_use_their_registry_id() {
+        let value = InstrumentImpl {
+            instrument: Cow::Borrowed("minecraft:ponder_goat_horn"),
+        };
+        assert_eq!(
+            value.write_data(),
+            NbtTag::String("minecraft:ponder_goat_horn".into())
+        );
+        let mut bytes = Vec::new();
+        value.serialize(&mut bytes).unwrap();
+        assert_eq!(bytes, vec![5]);
+
+        let mut remaining = bytes.as_slice();
+        let decoded = InstrumentImpl::deserialize(&mut remaining).unwrap();
+        assert!(remaining.is_empty());
+        assert_eq!(decoded, value);
+    }
+
+    #[test]
+    fn trim_material_components_use_their_registry_id() {
+        let value = ProvidesTrimMaterialImpl {
+            material: Cow::Borrowed("minecraft:redstone"),
+        };
+        let mut bytes = Vec::new();
+        value.serialize(&mut bytes).unwrap();
+        assert_eq!(bytes, vec![10]);
+
+        let mut remaining = bytes.as_slice();
+        let decoded = ProvidesTrimMaterialImpl::deserialize(&mut remaining).unwrap();
+        assert!(remaining.is_empty());
+        assert_eq!(decoded, value);
+    }
+
+    #[test]
+    fn invalid_registry_ids_fail_closed() {
+        let mut inline: &[u8] = &[0];
+        assert!(InstrumentImpl::deserialize(&mut inline).is_err());
+        let mut unknown: &[u8] = &[127];
+        assert!(InstrumentImpl::deserialize(&mut unknown).is_err());
+
+        let mut inline_trim: &[u8] = &[0, 2];
+        assert!(TrimImpl::deserialize(&mut inline_trim).is_err());
+        let mut inline_material: &[u8] = &[0];
+        assert!(ProvidesTrimMaterialImpl::deserialize(&mut inline_material).is_err());
     }
 }

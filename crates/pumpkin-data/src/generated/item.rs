@@ -1536,7 +1536,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl),
+            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl { material: Cow::Borrowed("minecraft:amethyst") }),
             (
                 Rarity,
                 &RarityImpl {
@@ -18423,7 +18423,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl),
+            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl { material: Cow::Borrowed("minecraft:copper") }),
             (
                 Rarity,
                 &RarityImpl {
@@ -25737,7 +25737,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl),
+            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl { material: Cow::Borrowed("minecraft:diamond") }),
             (
                 Rarity,
                 &RarityImpl {
@@ -28302,7 +28302,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl),
+            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl { material: Cow::Borrowed("minecraft:emerald") }),
             (
                 Rarity,
                 &RarityImpl {
@@ -32575,7 +32575,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (Instrument, &InstrumentImpl),
+            (Instrument, &InstrumentImpl { instrument: Cow::Borrowed("minecraft:ponder_goat_horn") }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -32731,7 +32731,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl),
+            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl { material: Cow::Borrowed("minecraft:gold") }),
             (
                 Rarity,
                 &RarityImpl {
@@ -39287,7 +39287,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl),
+            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl { material: Cow::Borrowed("minecraft:iron") }),
             (
                 Rarity,
                 &RarityImpl {
@@ -41677,7 +41677,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl),
+            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl { material: Cow::Borrowed("minecraft:lapis") }),
             (
                 Rarity,
                 &RarityImpl {
@@ -53151,7 +53151,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl),
+            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl { material: Cow::Borrowed("minecraft:netherite") }),
             (
                 Rarity,
                 &RarityImpl {
@@ -66780,7 +66780,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl),
+            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl { material: Cow::Borrowed("minecraft:quartz") }),
             (
                 Rarity,
                 &RarityImpl {
@@ -69630,7 +69630,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl),
+            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl { material: Cow::Borrowed("minecraft:redstone") }),
             (
                 Rarity,
                 &RarityImpl {
@@ -70072,7 +70072,7 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl),
+            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl { material: Cow::Borrowed("minecraft:resin") }),
             (
                 Rarity,
                 &RarityImpl {

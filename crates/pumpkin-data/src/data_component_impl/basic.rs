@@ -445,25 +445,71 @@ impl DataComponentImpl for BaseColorImpl {
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct InstrumentImpl;
+pub struct InstrumentImpl {
+    pub instrument: Cow<'static, str>,
+}
 impl InstrumentImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        data.extract_string().map(|instrument| Self {
+            instrument: Cow::Owned(instrument.to_owned()),
+        })
     }
 }
 impl DataComponentImpl for InstrumentImpl {
+    fn write_data(&self) -> NbtTag {
+        NbtTag::String(self.instrument.clone().into_owned().into())
+    }
+    fn get_hash(&self) -> i32 {
+        get_str_hash(self.instrument.as_ref()) as i32
+    }
     default_impl!(Instrument);
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct ProvidesTrimMaterialImpl;
+pub struct ProvidesTrimMaterialImpl {
+    pub material: Cow<'static, str>,
+}
 impl ProvidesTrimMaterialImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        data.extract_string().map(|material| Self {
+            material: Cow::Owned(material.to_owned()),
+        })
     }
 }
 impl DataComponentImpl for ProvidesTrimMaterialImpl {
+    fn write_data(&self) -> NbtTag {
+        NbtTag::String(self.material.clone().into_owned().into())
+    }
+    fn get_hash(&self) -> i32 {
+        get_str_hash(self.material.as_ref()) as i32
+    }
     default_impl!(ProvidesTrimMaterial);
+}
+
+#[cfg(test)]
+mod registry_component_hash_tests {
+    use super::{InstrumentImpl, ProvidesTrimMaterialImpl};
+    use crate::data_component_impl::{DataComponentImpl, get_str_hash};
+    use std::borrow::Cow;
+
+    #[test]
+    fn registry_holders_hash_the_namespaced_identifier() {
+        let instrument = InstrumentImpl {
+            instrument: Cow::Borrowed("minecraft:ponder_goat_horn"),
+        };
+        assert_eq!(
+            instrument.get_hash(),
+            get_str_hash("minecraft:ponder_goat_horn") as i32
+        );
+
+        let material = ProvidesTrimMaterialImpl {
+            material: Cow::Borrowed("minecraft:redstone"),
+        };
+        assert_eq!(
+            material.get_hash(),
+            get_str_hash("minecraft:redstone") as i32
+        );
+    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

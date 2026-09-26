@@ -1217,7 +1217,55 @@ impl DataComponentImpl for TrimImpl {
         compound.put("pattern", self.pattern.clone());
         NbtTag::Compound(compound)
     }
+    fn get_hash(&self) -> i32 {
+        let material = self.material.extract_string().unwrap_or_default();
+        let pattern = self.pattern.extract_string().unwrap_or_default();
+        let mut entries = [
+            (get_str_hash("material"), get_str_hash(material)),
+            (get_str_hash("pattern"), get_str_hash(pattern)),
+        ];
+        entries.sort_unstable_by_key(|(key, _)| *key);
+        let mut digest = Digest::new(Crc32Iscsi);
+        digest.update(&[2u8]);
+        for (key, value) in entries {
+            digest.update(&key.to_le_bytes());
+            digest.update(&value.to_le_bytes());
+        }
+        digest.update(&[3u8]);
+        digest.finalize() as i32
+    }
     default_impl!(Trim);
+}
+
+#[cfg(test)]
+mod trim_hash_tests {
+    use super::{DataComponentImpl, TrimImpl};
+    use crate::data_component_impl::get_str_hash;
+    use crc_fast::CrcAlgorithm::Crc32Iscsi;
+    use crc_fast::Digest;
+    use pumpkin_nbt::tag::NbtTag;
+
+    #[test]
+    fn trim_hash_matches_the_26_3_codec_map_fields() {
+        let trim = TrimImpl {
+            material: NbtTag::String("minecraft:iron".into()),
+            pattern: NbtTag::String("minecraft:coast".into()),
+        };
+        let mut entries = [
+            (get_str_hash("material"), get_str_hash("minecraft:iron")),
+            (get_str_hash("pattern"), get_str_hash("minecraft:coast")),
+        ];
+        entries.sort_unstable_by_key(|(key, _)| *key);
+
+        let mut expected = Digest::new(Crc32Iscsi);
+        expected.update(&[2u8]);
+        for (key, value) in entries {
+            expected.update(&key.to_le_bytes());
+            expected.update(&value.to_le_bytes());
+        }
+        expected.update(&[3u8]);
+        assert_eq!(trim.get_hash(), expected.finalize() as i32);
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

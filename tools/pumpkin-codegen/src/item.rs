@@ -843,7 +843,15 @@ impl ToTokens for ItemComponents {
             tokens.extend(quote! { (Glider, &GliderImpl), });
         }
         if self.instrument.is_some() {
-            tokens.extend(quote! { (Instrument, &InstrumentImpl), });
+            let instrument = self
+                .instrument
+                .as_ref()
+                .and_then(serde_json::Value::as_str)
+                .expect("instrument component should be a registry key");
+            let instrument = LitStr::new(instrument, Span::call_site());
+            tokens.extend(quote! {
+                (Instrument, &InstrumentImpl { instrument: Cow::Borrowed(#instrument) }),
+            });
         }
         if let Some(model) = &self.item_model {
             let model_lit = LitStr::new(model, Span::call_site());
@@ -934,7 +942,15 @@ impl ToTokens for ItemComponents {
             tokens.extend(quote! { (ProvidesBannerPatterns, &ProvidesBannerPatternsImpl), });
         }
         if self.provides_trim_material.is_some() {
-            tokens.extend(quote! { (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl), });
+            let material = self
+                .provides_trim_material
+                .as_ref()
+                .and_then(serde_json::Value::as_str)
+                .expect("provides_trim_material component should be a registry key");
+            let material = LitStr::new(material, Span::call_site());
+            tokens.extend(quote! {
+                (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl { material: Cow::Borrowed(#material) }),
+            });
         }
         if let Some(rarity_str) = &self.rarity {
             let rarity_variant = match rarity_str.as_str() {
