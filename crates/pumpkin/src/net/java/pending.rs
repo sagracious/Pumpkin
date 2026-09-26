@@ -302,8 +302,7 @@ impl PendingConnection {
                 self.close_token.cancel();
                 return;
             };
-            if self
-                .handle_plugin_response(server, response)
+            if Box::pin(self.handle_plugin_response(server, response))
                 .await
                 .is_some()
             {
