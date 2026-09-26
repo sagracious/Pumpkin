@@ -39,8 +39,8 @@ use tracing::{debug, error, warn};
 use crate::{
     entity::player::ChatMode,
     net::{
-        EncryptionError, GameProfile, MAX_PENDING_BYTES, PacketHandlerResult, PacketRateLimiter, PlayerConfig,
-        can_not_join,
+        EncryptionError, GameProfile, MAX_PENDING_BYTES, PacketHandlerResult, PacketRateLimiter,
+        PlayerConfig, can_not_join,
     },
     server::Server,
 };
@@ -262,16 +262,18 @@ impl PendingConnection {
         server: &Arc<Server>,
         packets: Vec<PacketTranslationOutput>,
     ) {
-        let total_bytes = packets
-            .iter()
-            .fold(0usize, |total, packet| total.saturating_add(packet.payload.len()));
+        let total_bytes = packets.iter().fold(0usize, |total, packet| {
+            total.saturating_add(packet.payload.len())
+        });
         if packets.len() > 64
             || total_bytes > MAX_PENDING_BYTES
             || packets.iter().any(|packet| {
                 packet.packet_id < 0 || packet.payload.len() > MAX_PACKET_SIZE as usize
             })
         {
-            warn!("Invalid native serverbound protocol follow-up output; closing pending connection");
+            warn!(
+                "Invalid native serverbound protocol follow-up output; closing pending connection"
+            );
             self.close_token.cancel();
             return;
         }
@@ -285,22 +287,26 @@ impl PendingConnection {
                     CURRENT_MC_VERSION,
                 )
             {
-                warn!("Unsupported native serverbound follow-up before play; closing pending connection");
+                warn!(
+                    "Unsupported native serverbound follow-up before play; closing pending connection"
+                );
                 self.close_token.cancel();
                 return;
             }
 
             let mut payload = packet.payload.as_ref();
-            let Ok(response) =
-                pumpkin_protocol::java::server::login::SLoginPluginResponse::read(
-                    &mut payload,
-                    &CURRENT_MC_VERSION,
-                )
-            else {
+            let Ok(response) = pumpkin_protocol::java::server::login::SLoginPluginResponse::read(
+                &mut payload,
+                &CURRENT_MC_VERSION,
+            ) else {
                 self.close_token.cancel();
                 return;
             };
-            if self.handle_plugin_response(server, response).await.is_some() {
+            if self
+                .handle_plugin_response(server, response)
+                .await
+                .is_some()
+            {
                 // An outgoing event cannot surface a pending-to-player
                 // transition through its caller. Current Via login replies are
                 // negative and never finish login.

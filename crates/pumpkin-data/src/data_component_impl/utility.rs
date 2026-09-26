@@ -416,7 +416,10 @@ mod map_decorations_tests {
         let input = NbtTag::Compound(decorations(false));
         let component = MapDecorationsImpl::read_data(&input).expect("compound value");
         assert_eq!(component.write_data(), input);
-        assert_eq!(MapDecorationsImpl::EMPTY.write_data(), NbtTag::Compound(NbtCompound::new()));
+        assert_eq!(
+            MapDecorationsImpl::EMPTY.write_data(),
+            NbtTag::Compound(NbtCompound::new())
+        );
         assert!(MapDecorationsImpl::read_data(&NbtTag::Int(1)).is_none());
     }
 

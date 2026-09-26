@@ -345,13 +345,15 @@ async fn apply_packet_sent_events(
         );
         let clientbound_packets = event_output.clientbound_packets;
         let serverbound_packets = event_output.serverbound_packets;
-        let follow_up_bytes = serverbound_packets
-            .iter()
-            .fold(0usize, |total, packet| total.saturating_add(packet.payload.len()));
-        let java_client = player.as_ref().and_then(|player| match player.client.as_ref() {
-            ClientPlatform::Java(client) => Some((player, client)),
-            ClientPlatform::Bedrock(_) => None,
+        let follow_up_bytes = serverbound_packets.iter().fold(0usize, |total, packet| {
+            total.saturating_add(packet.payload.len())
         });
+        let java_client = player
+            .as_ref()
+            .and_then(|player| match player.client.as_ref() {
+                ClientPlatform::Java(client) => Some((player, client)),
+                ClientPlatform::Bedrock(_) => None,
+            });
         if (!serverbound_packets.is_empty() && !native_layout)
             || serverbound_packets.len() > MAX_TRANSLATED_FOLLOW_UP_PACKETS
             || follow_up_bytes > MAX_PENDING_BYTES
@@ -1195,53 +1197,66 @@ impl JavaClient {
         native_layout: bool,
     ) -> Result<(), Box<dyn PumpkinError>> {
         let client_version = self.version.load();
-        let (packet_id, packet_payload, translated, cancelled, clientbound_packets, serverbound_packets) =
-            if native_layout {
-                (packet.id, packet.payload.clone(), true, false, Vec::new(), Vec::new())
-            } else {
-                let mut event = crate::plugin::server::packet::PacketReceivedEvent::new(
-                    player.clone(),
-                    packet.id,
-                    packet.payload.clone(),
-                );
-                server.plugin_manager.fire_blocking(server, &mut event);
-                if event.cancelled {
-                    return Ok(());
-                }
+        let (
+            packet_id,
+            packet_payload,
+            translated,
+            cancelled,
+            clientbound_packets,
+            serverbound_packets,
+        ) = if native_layout {
+            (
+                packet.id,
+                packet.payload.clone(),
+                true,
+                false,
+                Vec::new(),
+                Vec::new(),
+            )
+        } else {
+            let mut event = crate::plugin::server::packet::PacketReceivedEvent::new(
+                player.clone(),
+                packet.id,
+                packet.payload.clone(),
+            );
+            server.plugin_manager.fire_blocking(server, &mut event);
+            if event.cancelled {
+                return Ok(());
+            }
 
-                let mut packet_id = event.packet_id;
-                let mut packet_payload = event.payload;
-                let mut translated = false;
-                let mut cancelled = false;
-                let event_output = apply_protocol_packet_event(
-                    server,
-                    self.id,
-                    Some(player.clone()),
-                    PacketDirection::Serverbound,
-                    client_version,
-                    self.connection_state.load(),
-                    &mut packet_id,
-                    &mut packet_payload,
-                    &mut translated,
-                    &mut cancelled,
-                );
-                (
-                    packet_id,
-                    packet_payload,
-                    translated,
-                    cancelled,
-                    event_output.clientbound_packets,
-                    event_output.serverbound_packets,
-                )
-            };
+            let mut packet_id = event.packet_id;
+            let mut packet_payload = event.payload;
+            let mut translated = false;
+            let mut cancelled = false;
+            let event_output = apply_protocol_packet_event(
+                server,
+                self.id,
+                Some(player.clone()),
+                PacketDirection::Serverbound,
+                client_version,
+                self.connection_state.load(),
+                &mut packet_id,
+                &mut packet_payload,
+                &mut translated,
+                &mut cancelled,
+            );
+            (
+                packet_id,
+                packet_payload,
+                translated,
+                cancelled,
+                event_output.clientbound_packets,
+                event_output.serverbound_packets,
+            )
+        };
 
         for reply in clientbound_packets {
             self.try_enqueue_translated_packet(reply.packet_id, &reply.payload);
         }
 
-        let follow_up_bytes = serverbound_packets
-            .iter()
-            .fold(0usize, |total, packet| total.saturating_add(packet.payload.len()));
+        let follow_up_bytes = serverbound_packets.iter().fold(0usize, |total, packet| {
+            total.saturating_add(packet.payload.len())
+        });
         if (!serverbound_packets.is_empty() && !translated)
             || serverbound_packets.len() > MAX_TRANSLATED_FOLLOW_UP_PACKETS
             || follow_up_bytes > MAX_PENDING_BYTES

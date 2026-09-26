@@ -19,10 +19,7 @@ impl PendingConnection {
         debug!("Handling plugin");
         let proxy_config = &server.advanced_config.networking.proxy;
         if proxy_config.vine.enabled {
-            if !consume_matching_query_id(
-                &mut self.vine_message_id,
-                plugin_response.message_id.0,
-            ) {
+            if !consume_matching_query_id(&mut self.vine_message_id, plugin_response.message_id.0) {
                 return None;
             }
             let expected_challenge = self.vine_challenge.take();
