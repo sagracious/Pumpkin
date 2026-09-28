@@ -3631,10 +3631,23 @@ impl World {
         // Sends initial scoreboard state
         player.send_scoreboard();
 
-        // NOTE: the default-spawn packet used to be sent here, mid-join. It now
-        // goes out after the join broadcast below: clients (and client mods)
-        // need their level reckoned before they can handle it, and the awaits
-        // above (chunks, recipes, inventory, effects) give them that time.
+        let (spawn_block_pos, yaw, pitch) = {
+            let level_info = self.level_info.load();
+            (
+                BlockPos::new(level_info.spawn_x, level_info.spawn_y, level_info.spawn_z),
+                level_info.spawn_yaw,
+                level_info.spawn_pitch,
+            )
+        };
+        client
+            .send_packet(&CPlayerSpawnPosition::new(
+                spawn_block_pos,
+                yaw,
+                pitch,
+                self.dimension.minecraft_name.to_owned(),
+            ))
+            .await;
+
         // Send initial weather state
         let (is_raining, rain_level, thunder_level) = {
             let weather = self
@@ -3714,11 +3727,6 @@ impl World {
             // TODO: Switch to structured logging, e.g. info!(player = %name, "connected")
             info!("{}", event.join_message.to_pretty_console());
         }
-
-        // DIAGNOSTIC BUILD ONLY: default-spawn packet suppressed entirely to
-        // isolate the Xaero WorldMap NPE. If modded joins survive without it, the
-        // packet's presence/timing is the trigger; if they still fail, look
-        // elsewhere. Never merge this to master.
     }
 
     fn send_player_equipment(&self, from: &Player) {
