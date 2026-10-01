@@ -20,7 +20,6 @@ use pumpkin_data::dimension::Dimension;
 use pumpkin_data::entity::EntityStatus;
 use pumpkin_data::fluid::Fluid;
 use pumpkin_data::item_stack::ItemStack;
-use pumpkin_data::packet::CURRENT_MC_VERSION;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::tracked_data;
 use pumpkin_data::{Block, BlockDirection};

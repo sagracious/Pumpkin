@@ -111,7 +111,6 @@ impl PendingConnection {
             velocity_message_id: None,
             vine_message_id: None,
             vine_challenge: None,
-            server,
         }
     }
 

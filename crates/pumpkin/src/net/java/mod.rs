@@ -134,6 +134,10 @@ pub struct JavaClient {
     /// Unbounded like vanilla; `MAX_PENDING_BYTES` is the limit.
     outgoing_packet_queue_send: UnboundedSender<OutgoingPacket>,
     outgoing_packet_queue_recv: Option<UnboundedReceiver<OutgoingPacket>>,
+    /// A high-priority queue of serialized packets to send to the network.
+    outgoing_packet_priority_send: UnboundedSender<OutgoingPacket>,
+    /// A high-priority queue of serialized packets to send to the network.
+    outgoing_packet_priority_recv: Option<UnboundedReceiver<OutgoingPacket>>,
     /// Tracks total buffered payload bytes in the outgoing queue.
     pub pending_bytes: Arc<AtomicUsize>,
     /// The packet encoder for outgoing packets.
@@ -702,6 +706,7 @@ impl JavaClient {
         config: PlayerConfig,
     ) -> Self {
         let (send, recv) = tokio::sync::mpsc::unbounded_channel();
+        let (priority_send, priority_recv) = tokio::sync::mpsc::unbounded_channel();
 
         Self {
             id: pending.id,
@@ -720,6 +725,8 @@ impl JavaClient {
             rt_handle: tokio::runtime::Handle::current(),
             outgoing_packet_queue_send: send,
             outgoing_packet_queue_recv: Some(recv),
+            outgoing_packet_priority_send: priority_send,
+            outgoing_packet_priority_recv: Some(priority_recv),
             pending_bytes: Arc::new(AtomicUsize::new(0)),
             version: pending.version,
             network_writer: std::sync::Mutex::new(Some(pending.network_writer)),

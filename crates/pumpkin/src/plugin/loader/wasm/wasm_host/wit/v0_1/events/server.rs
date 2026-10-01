@@ -138,7 +138,7 @@ impl ToFromWasmEvent for ProtocolPacketEvent {
     fn to_wasm_event(&self, state: &mut PluginHostState) -> Event {
         let player = self.player.as_ref().map(|player| {
             state
-                .add_player(player.clone())
+                .add(player.clone())
                 .expect("failed to add player resource")
         });
         Event::ProtocolPacketEvent(ProtocolPacketEventData {

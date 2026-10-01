@@ -9,7 +9,6 @@ use crossbeam::atomic::AtomicCell;
 use dashmap::DashMap;
 use dashmap::DashSet;
 use pumpkin_data::entity::EntityType;
-use pumpkin_data::packet::CURRENT_MC_VERSION;
 use pumpkin_protocol::bedrock::client::CSetActorMotion;
 use pumpkin_protocol::bedrock::client::move_actor_delta::{
     CMoveActorDelta, MOVE_ACTOR_DELTA_FLAG_HAS_HEAD_YAW, MOVE_ACTOR_DELTA_FLAG_HAS_PITCH,
