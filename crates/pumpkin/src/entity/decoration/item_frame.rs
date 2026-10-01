@@ -14,7 +14,6 @@ use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::item_stack_seralizer::ItemStackSerializer;
 use pumpkin_protocol::java::client::play::{CSetEntityMetadata, Metadata};
 use pumpkin_util::math::vector3::Vector3;
-use pumpkin_util::version::JavaMinecraftVersion;
 
 /// An item frame or glow item frame.
 ///
@@ -356,21 +355,18 @@ impl EntityBase for ItemFrameEntity {
             );
             let rotation = self.get_rotation() as i32;
 
-            let mut data = Vec::new();
-            let meta_item = Metadata::new(
-                pumpkin_data::tracked_data::item_frame::ITEM,
-                item_serializer,
-            );
-            let meta_rot =
-                Metadata::new(pumpkin_data::tracked_data::item_frame::ROTATION, rotation);
+        let mut data = Vec::new();
+        let meta_item = Metadata::new(
+            pumpkin_data::tracked_data::item_frame::ITEM,
+            item_serializer,
+        );
+        let meta_rot = Metadata::new(pumpkin_data::tracked_data::item_frame::ROTATION, rotation);
 
-            if meta_item.write(&mut data, &ver).is_ok() && meta_rot.write(&mut data, &ver).is_ok() {
-                data.push(255);
-                let meta_packet =
-                    CSetEntityMetadata::new(self.entity.entity_id.into(), data.into());
-                if let Ok(meta_data) = client.serialize_packet(&meta_packet) {
-                    client.try_enqueue_packet(meta_data);
-                }
+        if meta_item.write(&mut data, &ver).is_ok() && meta_rot.write(&mut data, &ver).is_ok() {
+            data.push(255);
+            let meta_packet = CSetEntityMetadata::new(self.entity.entity_id.into(), data.into());
+            if let Ok(meta_data) = client.serialize_packet(&meta_packet) {
+                client.try_enqueue_packet(meta_data);
             }
         }
     }

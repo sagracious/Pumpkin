@@ -1331,7 +1331,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -2094,7 +2094,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -2341,7 +2341,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -3920,7 +3920,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -4127,7 +4127,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -7155,7 +7155,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -8444,7 +8444,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -9237,7 +9237,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -11764,7 +11764,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -11814,7 +11814,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -12214,7 +12214,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -12313,7 +12313,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -14087,7 +14087,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -16528,7 +16528,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -17991,7 +17991,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -19367,7 +19367,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -19821,7 +19821,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -19992,7 +19992,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -27422,7 +27422,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -27472,7 +27472,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -27968,7 +27968,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -28171,7 +28171,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -29094,7 +29094,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -29249,7 +29249,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -29299,7 +29299,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -29349,7 +29349,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -31520,7 +31520,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -31619,7 +31619,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -31817,7 +31817,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -32427,7 +32427,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -32625,7 +32625,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -36739,7 +36739,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -36987,7 +36987,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -37332,7 +37332,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -37850,7 +37850,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -37998,7 +37998,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -38962,7 +38962,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -46252,7 +46252,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -47682,7 +47682,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -49344,7 +49344,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -50229,7 +50229,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -51826,7 +51826,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -55283,7 +55283,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -58894,7 +58894,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -58993,7 +58993,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -59043,7 +59043,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -59290,7 +59290,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -59340,7 +59340,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -59440,7 +59440,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -59561,7 +59561,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -59611,7 +59611,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -61340,7 +61340,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -65274,7 +65274,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -67233,7 +67233,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -67454,7 +67454,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -70824,7 +70824,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -71900,7 +71900,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -72384,7 +72384,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -72483,7 +72483,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -72533,7 +72533,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -72654,7 +72654,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -72901,7 +72901,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -73797,7 +73797,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -74043,7 +74043,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -74613,7 +74613,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -75990,7 +75990,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -77324,7 +77324,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -77374,7 +77374,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -79421,7 +79421,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -80057,7 +80057,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -80963,7 +80963,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -81428,7 +81428,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -82204,7 +82204,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -82451,7 +82451,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -82501,7 +82501,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -82551,7 +82551,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -82651,7 +82651,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -82750,7 +82750,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -89094,7 +89094,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -89265,7 +89265,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -89315,7 +89315,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -89455,7 +89455,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -91494,7 +91494,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -91615,7 +91615,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -91665,7 +91665,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -91715,7 +91715,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -91765,7 +91765,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -91815,7 +91815,7 @@ impl Item {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (EntityData, &EntityDataImpl),
+            (EntityData, &EntityDataImpl { nbt: None }),
             (
                 ItemModel,
                 &ItemModelImpl {

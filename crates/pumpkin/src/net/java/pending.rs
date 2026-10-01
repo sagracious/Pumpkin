@@ -42,6 +42,7 @@ use crate::{
         EncryptionError, GameProfile, MAX_PENDING_BYTES, PacketHandlerResult, PacketRateLimiter,
         PlayerConfig, can_not_join,
     },
+    plugin::server::packet::{ConnectionPacketReceivedEvent, ConnectionPacketSentEvent},
     server::Server,
 };
 
@@ -89,11 +90,12 @@ impl PendingConnection {
         address: SocketAddr,
         id: u64,
         packet_limiter: PacketRateLimiter,
+        server: Weak<Server>,
     ) -> Self {
         let (read, write) = tcp_stream.into_split();
         Self {
             id,
-            server: Weak::new(),
+            server,
             address,
             server_address: String::new(),
             version: AtomicCell::new(CURRENT_MC_VERSION),
@@ -109,6 +111,7 @@ impl PendingConnection {
             velocity_message_id: None,
             vine_message_id: None,
             vine_challenge: None,
+            server,
         }
     }
 
@@ -180,6 +183,17 @@ impl PendingConnection {
         }
     }
 
+    /// Server for the connection packet events, only for clients below 26.3 after handshake.
+    fn translating_server(&self) -> Option<Arc<Server>> {
+        if self.version.load() == CURRENT_MC_VERSION
+            || self.connection_state.load() == ConnectionState::HandShake
+        {
+            return None;
+        }
+        self.server.upgrade()
+    }
+
+    /// Encoded as 26.3. `ConnectionPacketSentEvent` can rewrite it.
     pub async fn send_packet_now<P: ClientPacket>(&mut self, packet: &P) {
         let mut packet_buf = Vec::new();
         if let Err(err) =
@@ -314,6 +328,72 @@ impl PendingConnection {
                 return;
             }
         }
+    }
+
+    /// `ConnectionPacketSentEvent` with the 26.3 packet. `None` when cancelled.
+    async fn translate_outgoing(&self, packet_data: Bytes) -> Option<Bytes> {
+        let Some(server) = self.translating_server() else {
+            return Some(packet_data);
+        };
+        if !server
+            .plugin_manager
+            .has_handlers::<ConnectionPacketSentEvent>()
+        {
+            return Some(packet_data);
+        }
+
+        let mut reader = &packet_data[..];
+        let Ok(packet_id) = reader.get_var_int() else {
+            return Some(packet_data);
+        };
+        let payload = packet_data.slice(packet_data.len() - reader.len()..);
+        let mut event = ConnectionPacketSentEvent::new(
+            self.id,
+            self.version.load(),
+            self.connection_state.load(),
+            packet_id.0,
+            payload,
+        );
+        server.plugin_manager.fire(&server, &mut event).await;
+        if event.cancelled {
+            return None;
+        }
+
+        let mut framed = Vec::with_capacity(5 + event.payload.len());
+        framed.write_var_int(&VarInt(event.packet_id)).ok()?;
+        framed.extend_from_slice(&event.payload);
+        Some(framed.into())
+    }
+
+    /// `ConnectionPacketReceivedEvent` with the client's packet; handlers rewrite it to 26.3.
+    /// `None` when cancelled.
+    async fn translate_incoming(&self, packet: &RawPacket) -> Option<RawPacket> {
+        let unchanged = || RawPacket {
+            id: packet.id,
+            payload: packet.payload.clone(),
+        };
+        let Some(server) = self.translating_server() else {
+            return Some(unchanged());
+        };
+        if !server
+            .plugin_manager
+            .has_handlers::<ConnectionPacketReceivedEvent>()
+        {
+            return Some(unchanged());
+        }
+
+        let mut event = ConnectionPacketReceivedEvent::new(
+            self.id,
+            self.version.load(),
+            self.connection_state.load(),
+            packet.id,
+            packet.payload.clone(),
+        );
+        server.plugin_manager.fire(&server, &mut event).await;
+        (!event.cancelled).then(|| RawPacket {
+            id: event.packet_id,
+            payload: event.payload,
+        })
     }
 
     pub async fn kick(&mut self, reason: TextComponent) {
@@ -472,7 +552,7 @@ impl PendingConnection {
                     server,
                     pumpkin_protocol::java::server::handshake::SHandShake::read(
                         &mut payload,
-                        &self.version.load(),
+                        &CURRENT_MC_VERSION,
                     )?,
                 )
                 .await;
@@ -721,31 +801,23 @@ impl PendingConnection {
                 | ResourcePackResponseResult::DownloadSuccess
                 | ResourcePackResponseResult::Discarded
                 | ResourcePackResponseResult::Unknown(_) => {
-                    if self.version.load() >= JavaMinecraftVersion::V_1_20_5 {
-                        self.send_known_packs(server).await;
-                    } else {
-                        self.handle_known_packs(server).await;
-                    }
+                    self.send_known_packs(server).await;
                 }
                 ResourcePackResponseResult::Accepted => {}
                 ResourcePackResponseResult::Declined => {
                     if resource_config.force {
                         self.kick(TextComponent::text("Required resource pack was declined"))
                             .await;
-                    } else if self.version.load() >= JavaMinecraftVersion::V_1_20_5 {
-                        self.send_known_packs(server).await;
                     } else {
-                        self.handle_known_packs(server).await;
+                        self.send_known_packs(server).await;
                     }
                 }
                 ResourcePackResponseResult::DownloadFail => {
                     if resource_config.force {
                         self.kick(TextComponent::text("Failed to download resource pack"))
                             .await;
-                    } else if self.version.load() >= JavaMinecraftVersion::V_1_20_5 {
-                        self.send_known_packs(server).await;
                     } else {
-                        self.handle_known_packs(server).await;
+                        self.send_known_packs(server).await;
                     }
                 }
                 ResourcePackResponseResult::InvalidUrl => {
