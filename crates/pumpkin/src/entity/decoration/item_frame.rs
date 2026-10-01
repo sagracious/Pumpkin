@@ -369,6 +369,7 @@ impl EntityBase for ItemFrameEntity {
                 client.try_enqueue_packet(meta_data);
             }
         }
+        }
     }
 
     fn interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
