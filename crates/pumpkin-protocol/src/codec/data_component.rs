@@ -3081,6 +3081,7 @@ mod trim_instrument_registry_tests {
         assert!(ProvidesTrimMaterialImpl::deserialize(&mut inline_material).is_err());
     }
 }
+#[cfg(test)]
 mod tests {
     use super::*;
 
