@@ -1,4 +1,6 @@
-use pumpkin_protocol::java::client::play::{CChunkBatchEnd, CChunkBatchStart, CPlayDisconnect};
+use pumpkin_protocol::java::client::play::{
+    CChunkBatchEnd, CChunkBatchStart, CLightUpdate, CPlayDisconnect,
+};
 use pumpkin_world::level::SyncChunk;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering};
@@ -44,7 +46,7 @@ use tokio::{
     sync::oneshot,
 };
 use tokio::{
-    sync::mpsc::{UnboundedReceiver, UnboundedSender},
+    sync::mpsc::{UnboundedReceiver, UnboundedSender, error::TryRecvError},
     task::JoinHandle,
 };
 use tokio_util::sync::CancellationToken;
@@ -969,23 +971,51 @@ impl JavaClient {
             return false;
         }
 
+        let version = self.version.load();
         let (tx, rx) = oneshot::channel();
         rayon::spawn(move || {
             let mut serialized = Vec::with_capacity(valid_chunks.len());
             for chunk in valid_chunks {
                 let mut buf = Vec::with_capacity(32 * 1024);
-                if let Err(err) = buf.write_var_int(&VarInt(CChunkData::to_id(CURRENT_MC_VERSION)))
-                {
+                if let Err(err) = buf.write_var_int(&VarInt(CChunkData::to_id(version))) {
                     error!("Failed to write chunk data id: {err:?}");
                     continue;
                 }
-                if let Err(err) =
-                    CChunkData(&chunk).write_packet_data(&mut buf, &CURRENT_MC_VERSION)
-                {
+                if let Err(err) = CChunkData(&chunk).write_packet_data(&mut buf, &version) {
                     error!("Failed to write chunk data: {err:?}");
                     continue;
                 }
-                serialized.push(Bytes::from(buf));
+
+                let light_buf = if version >= JavaMinecraftVersion::V_1_14
+                    && version < JavaMinecraftVersion::V_1_18
+                {
+                    match <CLightUpdate as ChunkLightExt>::from_chunk(&chunk, version) {
+                        Ok(light_packet) => {
+                            let mut light_buf = Vec::new();
+                            if let Err(err) =
+                                light_buf.write_var_int(&VarInt(CLightUpdate::to_id(version)))
+                            {
+                                error!("Failed to write light update id: {err:?}");
+                                None
+                            } else if let Err(err) =
+                                light_packet.write_packet_data(&mut light_buf, &version)
+                            {
+                                error!("Failed to write light update data: {err:?}");
+                                None
+                            } else {
+                                Some(Bytes::from(light_buf))
+                            }
+                        }
+                        Err(err) => {
+                            error!("Failed to create light update packet: {err:?}");
+                            None
+                        }
+                    }
+                } else {
+                    None
+                };
+
+                serialized.push((Bytes::from(buf), light_buf));
             }
             let _ = tx.send(serialized);
         });
@@ -1011,8 +1041,9 @@ impl JavaClient {
             }
         }
 
-        // One FIFO per connection: batch start/data/end stay in enqueue order.
-        for chunk_data in serialized {
+        // Keep the whole batch on the priority queue. Otherwise the batch end can overtake chunk
+        // data queued on the normal channel, leaving the client unable to render those chunks.
+        for (chunk_data, light_data) in serialized {
             self.send_packet_now_data(chunk_data).await;
             if self.is_closed() {
                 return false;
