@@ -42,7 +42,6 @@ use crate::{
         EncryptionError, GameProfile, MAX_PENDING_BYTES, PacketHandlerResult, PacketRateLimiter,
         PlayerConfig, can_not_join,
     },
-    plugin::server::packet::{ConnectionPacketReceivedEvent, ConnectionPacketSentEvent},
     server::Server,
 };
 
@@ -183,6 +182,9 @@ impl PendingConnection {
     }
 
     /// Server for the connection packet events, only for clients below 26.3 after handshake.
+    /// Currently uncalled: the pre-player path fires `ProtocolPacketEvent`
+    /// directly so the multiversion plugin translates login and config.
+    #[allow(dead_code)]
     fn translating_server(&self) -> Option<Arc<Server>> {
         if self.version.load() == CURRENT_MC_VERSION
             || self.connection_state.load() == ConnectionState::HandShake
@@ -327,72 +329,6 @@ impl PendingConnection {
                 return;
             }
         }
-    }
-
-    /// `ConnectionPacketSentEvent` with the 26.3 packet. `None` when cancelled.
-    async fn translate_outgoing(&self, packet_data: Bytes) -> Option<Bytes> {
-        let Some(server) = self.translating_server() else {
-            return Some(packet_data);
-        };
-        if !server
-            .plugin_manager
-            .has_handlers::<ConnectionPacketSentEvent>()
-        {
-            return Some(packet_data);
-        }
-
-        let mut reader = &packet_data[..];
-        let Ok(packet_id) = reader.get_var_int() else {
-            return Some(packet_data);
-        };
-        let payload = packet_data.slice(packet_data.len() - reader.len()..);
-        let mut event = ConnectionPacketSentEvent::new(
-            self.id,
-            self.version.load(),
-            self.connection_state.load(),
-            packet_id.0,
-            payload,
-        );
-        server.plugin_manager.fire(&server, &mut event).await;
-        if event.cancelled {
-            return None;
-        }
-
-        let mut framed = Vec::with_capacity(5 + event.payload.len());
-        framed.write_var_int(&VarInt(event.packet_id)).ok()?;
-        framed.extend_from_slice(&event.payload);
-        Some(framed.into())
-    }
-
-    /// `ConnectionPacketReceivedEvent` with the client's packet; handlers rewrite it to 26.3.
-    /// `None` when cancelled.
-    async fn translate_incoming(&self, packet: &RawPacket) -> Option<RawPacket> {
-        let unchanged = || RawPacket {
-            id: packet.id,
-            payload: packet.payload.clone(),
-        };
-        let Some(server) = self.translating_server() else {
-            return Some(unchanged());
-        };
-        if !server
-            .plugin_manager
-            .has_handlers::<ConnectionPacketReceivedEvent>()
-        {
-            return Some(unchanged());
-        }
-
-        let mut event = ConnectionPacketReceivedEvent::new(
-            self.id,
-            self.version.load(),
-            self.connection_state.load(),
-            packet.id,
-            packet.payload.clone(),
-        );
-        server.plugin_manager.fire(&server, &mut event).await;
-        (!event.cancelled).then(|| RawPacket {
-            id: event.packet_id,
-            payload: event.payload,
-        })
     }
 
     pub async fn kick(&mut self, reason: TextComponent) {
