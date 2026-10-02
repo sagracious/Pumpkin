@@ -836,16 +836,31 @@ impl JavaClient {
                         }
                     }
                     let packet = pumpkin_protocol::java::client::play::CKeepAlive::new(keep_alive_id);
+                    debug!(
+                        connection_id = self.id,
+                        keep_alive_id,
+                        "DIAG: sending keep-alive"
+                    );
                     self.enqueue_client_packet(&packet).await;
                 }
 
                 () = self.close_token.cancelled() => {
+                    debug!(
+                        connection_id = self.id,
+                        state = ?self.connection_state.load(),
+                        "DIAG: read loop cancelled"
+                    );
                     break;
                 }
 
                 // INCOMING PACKETS
                 packet_opt = self.get_packet_with_reader(&mut network_reader) => {
                     let Some(packet) = packet_opt else {
+                        debug!(
+                            connection_id = self.id,
+                            state = ?self.connection_state.load(),
+                            "DIAG: read loop ended"
+                        );
                         break;
                     };
                     self.last_packet_time.store(Instant::now());
