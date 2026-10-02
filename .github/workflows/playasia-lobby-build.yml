@@ -56,6 +56,9 @@ jobs:
         env:
           SCCACHE_GHA_ENABLED: "true"
           RUSTC_WRAPPER: sccache
+          # rustc SIGSEGVs in MIR match lowering on giant generated matches
+          # (pumpkin-data); raise the driver stack. Revisit if profile changes.
+          RUST_MIN_STACK: "33554432"
         run: cargo build --profile playasia-lobby --package pumpkin --bin pumpkin --locked
 
       - name: Show compiler cache stats
