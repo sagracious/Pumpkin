@@ -7,7 +7,7 @@ impl JavaClient {
     pub fn handle_spectate_entity(
         &self,
         player: &Arc<Player>,
-        server: &Server,
+        _server: &Server,
         packet: &SSpectateEntity,
     ) {
         if !player.has_client_loaded() {
@@ -19,8 +19,15 @@ impl JavaClient {
             return;
         }
 
+        let Some(target_id) = packet.target else {
+            // Client cleared its spectate target: camera back to self.
+            player.camera_target_id.store(None);
+            player.try_send_client_packet(&CSetCamera::new(player.entity_id().into()));
+            return;
+        };
+
         let world = player.world();
-        if let Some(target) = world.get_entity_by_uuid(packet.target) {
+        if let Some(target) = world.get_entity_by_id(target_id) {
             let target_pos = target.get_entity().pos.load();
             let target_yaw = target.get_entity().yaw.load();
             let target_pitch = target.get_entity().pitch.load();
@@ -30,7 +37,17 @@ impl JavaClient {
             player.try_send_client_packet(&CSetCamera::new(target_id.into()));
 
             player.request_teleport(target_pos, target_yaw, target_pitch);
-        } else if let Some(target_player) = server.get_player_by_uuid(packet.target) {
+        } else if let Some(target_player) = world.get_player_by_id(target_id) {
+            let target_pos = target.get_entity().pos.load();
+            let target_yaw = target.get_entity().yaw.load();
+            let target_pitch = target.get_entity().pitch.load();
+            let target_id = target.get_entity().entity_id;
+
+            player.camera_target_id.store(Some(target_id));
+            player.try_send_client_packet(&CSetCamera::new(target_id.into()));
+
+            player.request_teleport(target_pos, target_yaw, target_pitch);
+        } else if let Some(target_player) = world.get_player_by_id(target_id) {
             let target_pos = target_player.living_entity.entity.pos.load();
             let target_yaw = target_player.living_entity.entity.yaw.load();
             let target_pitch = target_player.living_entity.entity.pitch.load();

@@ -1449,8 +1449,12 @@ pub fn deserialize_java_serverbound_packet(
         id if id == pumpkin_protocol::java::server::play::SSpectateEntity::to_id(version) => {
             use pumpkin_protocol::ServerPacket;
             let p = <pumpkin_protocol::java::server::play::SSpectateEntity as pumpkin_protocol::ServerPacket>::read(&mut payload, &version).ok()?;
+            // Deviation from codegen: the wire format is an optional entity id,
+            // which has no UUID counterpart. The WIT shape still carries the
+            // legacy uuid until a proper WIT revision lands.
+            let _ = &p.target;
             Some(ServerboundPacket::SSpectateEntity(crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::java_packets::SSpectateEntity {
-                target: crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::uuid::Uuid { high: p.target.as_u64_pair().1, low: p.target.as_u64_pair().0 },
+                target: crate::plugin::loader::wasm::wasm_host::wit::v0_1::pumpkin::plugin::uuid::Uuid { high: 0, low: 0 },
             }))
         }
         id if id == pumpkin_protocol::java::server::play::STeleportToEntity::to_id(version) => {
