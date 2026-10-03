@@ -994,16 +994,22 @@ impl JavaClient {
         }
 
         let version = self.version.load();
+        // Serialize chunk payloads in native layout while a protocol
+        // translator is active so it always sees consistent input; the
+        // batch markers below still follow the client's version.
+        let payload_version = self.packet_encoding_version();
         let (tx, rx) = oneshot::channel();
         rayon::spawn(move || {
             let mut serialized = Vec::with_capacity(valid_chunks.len());
             for chunk in valid_chunks {
                 let mut buf = Vec::with_capacity(32 * 1024);
-                if let Err(err) = buf.write_var_int(&VarInt(CChunkData::to_id(version))) {
+                if let Err(err) = buf.write_var_int(&VarInt(CChunkData::to_id(payload_version))) {
                     error!("Failed to write chunk data id: {err:?}");
                     continue;
                 }
-                if let Err(err) = CChunkData(&chunk).write_packet_data(&mut buf, &version) {
+                if let Err(err) =
+                    CChunkData(&chunk).write_packet_data(&mut buf, &payload_version)
+                {
                     error!("Failed to write chunk data: {err:?}");
                     continue;
                 }
@@ -1011,16 +1017,16 @@ impl JavaClient {
                 let light_buf = if version >= JavaMinecraftVersion::V_1_14
                     && version < JavaMinecraftVersion::V_1_18
                 {
-                    match <CLightUpdate as ChunkLightExt>::from_chunk(&chunk, version) {
+                    match <CLightUpdate as ChunkLightExt>::from_chunk(&chunk, payload_version) {
                         Ok(light_packet) => {
                             let mut light_buf = Vec::new();
-                            if let Err(err) =
-                                light_buf.write_var_int(&VarInt(CLightUpdate::to_id(version)))
+                            if let Err(err) = light_buf
+                                .write_var_int(&VarInt(CLightUpdate::to_id(payload_version)))
                             {
                                 error!("Failed to write light update id: {err:?}");
                                 None
-                            } else if let Err(err) =
-                                light_packet.write_packet_data(&mut light_buf, &version)
+                            } else if let Err(err) = light_packet
+                                .write_packet_data(&mut light_buf, &payload_version)
                             {
                                 error!("Failed to write light update data: {err:?}");
                                 None
