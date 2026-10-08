@@ -30,27 +30,32 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          # Pinned: stable rolled 1.98.1 -> 1.99.0 and 1.99.0 SIGSEGVs on
-          # pumpkin-data. Re-pin deliberately, never float here.
-          toolchain: 1.98.1
-      - uses: Swatinem/rust-cache@v2
-        with:
-          # The previous cache deliberately excluded workspace crates, so each
-          # tiny protocol edit rebuilt every local crate from scratch.
-          # Bump this when the iterative profile changes so old release/LTO
-          # artifacts are not restored and recompiled under a new fingerprint.
-          # v3: cold cache after repeated rustc SIGSEGV on restored artifacts.
-          prefix-key: v3-playasia-lobby
-          # sccache below owns workspace compiler outputs; keep this cache for
-          # Cargo's registry and git dependencies only.
-          cache-workspace-crates: false
+      - parallel:
+          - uses: dtolnay/rust-toolchain@stable
+            with:
+              # Pinned: stable rolled 1.98.1 -> 1.99.0 and 1.99.0 SIGSEGVs on
+              # pumpkin-data. Re-pin deliberately, never float here.
+              toolchain: 1.98.1
+          - name: Run sccache cache
+            uses: mozilla-actions/sccache-action@v0.0.11
+            with:
+              disable_annotations: true
+          - uses: Swatinem/rust-cache@v2
+            with:
+              # The previous cache deliberately excluded workspace crates, so each
+              # tiny protocol edit rebuilt every local crate from scratch.
+              # Bump this when the iterative profile changes so old release/LTO
+              # artifacts are not restored and recompiled under a new fingerprint.
+              # v3: cold cache after repeated rustc SIGSEGV on restored artifacts.
+              prefix-key: v3-playasia-lobby
+              # sccache below owns workspace compiler outputs; keep this cache for
+              # Cargo's registry and git dependencies only.
+              cache-workspace-crates: false
 
-      - name: Run sccache cache
-        uses: mozilla-actions/sccache-action@v0.0.11
-        with:
-          disable_annotations: true
+      - name: Install mold linker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mold clang
 
       - name: Build Pumpkin
         env:
@@ -59,6 +64,10 @@ jobs:
           # rustc SIGSEGVs in MIR match lowering on giant generated matches
           # (pumpkin-data); raise the driver stack. Revisit if profile changes.
           RUST_MIN_STACK: "33554432"
+          # mold links the 220 MB binary far faster than GNU ld; same code in,
+          # same bytes out semantically. First build after this change
+          # re-keys the sccache cache once.
+          RUSTFLAGS: "-Dwarnings -C linker=clang -C link-arg=-fuse-ld=mold"
         run: cargo build --profile playasia-lobby --package pumpkin --bin pumpkin --locked
 
       - name: Show compiler cache stats
