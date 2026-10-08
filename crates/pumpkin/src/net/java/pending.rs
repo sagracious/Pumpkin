@@ -270,8 +270,10 @@ impl PendingConnection {
         }
     }
 
-    /// Handles a serverbound login reply synthesized from a clientbound login
-    /// query. Play-state follow-ups are handled by `JavaClient`.
+    /// Handles serverbound replies synthesized from clientbound queries.
+    /// Login plugin-query replies and config known-packs answers (sent by
+    /// multiversion translators for clients that lack the packet) are
+    /// accepted here. Play-state follow-ups are handled by `JavaClient`.
     async fn process_native_serverbound_packets(
         &mut self,
         server: &Arc<Server>,
@@ -294,6 +296,18 @@ impl PendingConnection {
         }
 
         for packet in packets {
+            // Older clients have no Select Known Packs, so translators answer
+            // it for them; without the answer the server waits in config
+            // forever. Handled the same way as the login plugin response.
+            if matches!(self.connection_state.load(), ConnectionState::Config)
+                && packet.packet_id
+                    == pumpkin_protocol::java::server::config::SKnownPacks::to_id(
+                        CURRENT_MC_VERSION,
+                    )
+            {
+                Box::pin(self.handle_known_packs(server)).await;
+                continue;
+            }
             if !matches!(
                 self.connection_state.load(),
                 ConnectionState::Login | ConnectionState::Transfer
