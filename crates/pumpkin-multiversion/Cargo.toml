@@ -1,0 +1,16 @@
+[package]
+name = "pumpkin-multiversion"
+version.workspace = true
+description = "Native multiversion translator for older Java clients."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+pumpkin-core.workspace = true
+pumpkin-data.workspace = true
+pumpkin-util.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

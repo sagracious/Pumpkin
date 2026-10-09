@@ -3088,6 +3088,7 @@ dependencies = [
  "pumpkin-config",
  "pumpkin-core",
  "pumpkin-data",
+ "pumpkin-multiversion",
  "pumpkin-util",
  "pumpkin-wasm-host",
  "pumpkin-world",
@@ -3312,6 +3313,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.6",
+]
+
+[[package]]
+name = "pumpkin-multiversion"
+version = "0.2.0+26.3-26.51"
+dependencies = [
+ "pumpkin-core",
+ "pumpkin-data",
+ "pumpkin-util",
+ "tracing",
 ]
 
 [[package]]

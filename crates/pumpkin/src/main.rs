@@ -139,6 +139,7 @@ async fn main() {
         tracing::error!("Failed to initialize world storage: {error}");
         exit(1);
     });
+    pumpkin_multiversion::register_translator(&pumpkin_server.server.plugin_manager);
     let plugin_wait_time = pumpkin_server.init_plugins().await;
 
     let time_elapsed = time.elapsed().saturating_sub(plugin_wait_time);

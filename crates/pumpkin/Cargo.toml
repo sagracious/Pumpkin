@@ -14,6 +14,7 @@ LegalCopyright = "Copyright © 2026 Aleksander Medvedev"
 
 [dependencies]
 pumpkin-core.workspace = true
+pumpkin-multiversion.workspace = true
 pumpkin-wasm-host.workspace = true
 pumpkin-config.workspace = true
 pumpkin-data = { workspace = true, features = ["default"] }
